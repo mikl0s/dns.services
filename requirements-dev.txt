@@ -4,7 +4,6 @@ flake8
 mypy
 pre-commit
 types-requests
-types-python-dotenv
 
 # Testing
 pytest
