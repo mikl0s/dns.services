@@ -1,6 +1,6 @@
-# 🌐 DNS Services Gateway
+# 🌐 DNS.Services Gateway
 
-Welcome to the **DNS Services Gateway** project! This Python script allows you to interact with the DNS.services API to manage your DNS records and domains effortlessly.
+Welcome to the **DNS.Services Gateway** project! This Python script allows you to interact with the DNS.services API to manage your DNS records and domains effortlessly.
 
 ---
 
