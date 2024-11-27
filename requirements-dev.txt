@@ -1,13 +1,13 @@
 # Code Quality
-black==23.12.0
-flake8==6.1.0
-mypy==1.7.1
-pre-commit==3.5.0
-types-requests==2.31.0.10
-types-python-dotenv==1.0.0.1
+black
+flake8
+mypy
+pre-commit
+types-requests
+types-python-dotenv
 
 # Testing
-pytest==7.4.3
-pytest-cov==4.1.0
-responses==0.24.1
-pytest-mock==3.12.0
+pytest
+pytest-cov
+responses
+pytest-mock
