@@ -33,66 +33,60 @@ cd dns-services-gateway
 pip install -r requirements.txt
 ```
 
-## Quick Start
+## Usage
 
-### CLI Usage
+### Installation
 
-1. Set up your credentials in a `.env` file:
 ```bash
-DNS_SERVICES_BASE_URL="https://dns.services"
-DNS_SERVICES_USERNAME="your-username"
-DNS_SERVICES_PASSWORD="your-password"
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+.\venv\Scripts\activate  # Windows
+
+# Install package
+pip install -r requirements.txt
 ```
 
-2. List DNS records for a domain:
+### Configuration
+
+Set up your environment variables:
+
 ```bash
-python dsg.py example.com -v
+# Required
+export DNS_SERVICES_USERNAME="your_username"
+export DNS_SERVICES_PASSWORD="your_password"
+
+# Optional
+export DNS_SERVICES_BASE_URL="https://dns.services"  # Default
+export DNS_SERVICES_TOKEN_PATH="~/.dns-services/token"  # JWT token storage
+export DNS_SERVICES_VERIFY_SSL="true"  # Enable/disable SSL verification
+export DNS_SERVICES_TIMEOUT="30"  # API timeout in seconds
+export DNS_SERVICES_DEBUG="false"  # Enable debug logging
 ```
 
-3. Create a new DNS record:
-```bash
-python dsg.py example.com --create --type A --name www --content "192.0.2.1"
-```
+Or create a `.env` file (see `.env.example`).
 
-### Programmatic Usage
+### Examples
 
 ```python
-from dns_services_gateway import DNSServicesClient
+from dns_services_gateway import DNSServicesClient, DNSServicesConfig
 
-# Initialize the client
-client = DNSServicesClient()
+# Create client
+config = DNSServicesConfig.from_env()
+client = DNSServicesClient(config)
 
-# List all domains
-domains = client.list_domains()
+# List domains
+domains = client.get("/domains")
 
-# Create a new DNS record
-record = client.create_record(
-    domain="example.com",
-    record_type="A",
-    name="www",
-    content="192.0.2.1"
-)
-
-# Update a DNS record
-client.update_record(
-    domain="example.com",
-    record_id="record_id",
-    content="192.0.2.2"
-)
+# Create DNS record
+response = client.post("/domains/example.com/records", json={
+    "type": "A",
+    "name": "www",
+    "content": "192.0.2.1",
+    "ttl": 3600
+})
 ```
-
-## Command Line Options
-
-| Option | Description |
-|--------|-------------|
-| `-v, --verbose` | Enable verbose output |
-| `--no-color` | Disable colored output and icons |
-| `--create` | Create a new DNS record |
-| `--update` | Update an existing DNS record |
-| `--delete` | Delete a DNS record |
-| `--type` | Specify record type (A, AAAA, CNAME, TXT, etc.) |
-| `--name` | Record name/hostname |
-| `--content` | Record content/value |
 
 ## API Documentation
 
