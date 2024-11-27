@@ -1,114 +1,54 @@
-# Python specific
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-
-# Environment variables
-.env
-
-# Byte-compiled / optimized / DLL files
-*.pyc
-
-# C extensions
+*$py.class
 *.so
 
 # Distribution / packaging
-.Python
-build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
+build/
 *.egg-info/
-.installed.cfg
 *.egg
+.eggs/
+src/*.egg-info/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# PyInstaller
-dist/
-build/
-*.spec
-
-# Installer logs
-distutils.log
-
-# Unit test / coverage reports
-htmlcov/
+# Testing
 .tox/
-.nox/
+.pytest_cache/
 .coverage
 .coverage.*
-.cache
-nosetests.xml
+htmlcov/
 coverage.xml
-*.cover
 .hypothesis/
+.pytest_cache/
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-# pyenv
-.python-version
-
-# pipenv
-Pipfile.lock
-
-# poetry
-poetry.lock
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow
-__pypackages__/
-
-# Celery
-celerybeat-schedule
-
-# SageMath
-data/
-
-# Environments
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
+# Type checking
 .mypy_cache/
 .dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
+dmypy.json
 .pytype/
 
-# Cython debug symbols
-cython_debug/
+# Environment
+.env
+.venv/
+venv/
+ENV/
+env/
 
-# PyCharm
+# IDE
 .idea/
-
-# VSCode
 .vscode/
+*.swp
+*.swo
+*~
 
+# Documentation
+/site/
+docs/_build/
+
+# Misc
+.DS_Store
+*.log
+.cache/
