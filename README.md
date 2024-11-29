@@ -20,7 +20,9 @@
 
 A Python client library and CLI tool for managing DNS records through the DNS.services API. This tool provides a simple and intuitive interface for managing domains and DNS records programmatically or via command line.
 
-The DNS.Services API endpoints have been descoped, to only implement domains, DNS and Clientarea. The scope of this module is to securely manage domains and DNS entries programatically.
+For this module, the DNS.Services API endpoints have been descoped, to only implement domains, DNS and Clientarea endpoints.
+
+The scope of this module is to securely manage domains and DNS entries programatically.
 
 ## Features
 
@@ -53,6 +55,111 @@ The DNS.Services API endpoints have been descoped, to only implement domains, DN
   - 97% test coverage
   - Black code formatting
   - Flake8 compliance
+
+## DNS Templates
+
+The DNS Services Gateway supports a powerful templating system for managing DNS configurations across multiple domains and environments. Templates allow you to define reusable DNS configurations with variable substitution, environment-specific overrides, and comprehensive validation.
+
+### Template Features
+
+- 📝 YAML-based configuration
+- 🔄 Variable substitution
+- 🌍 Environment-specific overrides
+- 🔍 Pre-application validation
+- 🔒 Safety features (backup, rollback)
+- 📊 Version tracking
+
+### Template Structure
+
+```yaml
+# Template metadata
+metadata:
+  version: "1.0.0"
+  description: "Common web and mail configuration"
+  author: "DNS Services Gateway"
+
+# Variables for substitution
+variables:
+  domain: "example.com"
+  ttl: 3600
+
+# Record groups by purpose
+records:
+  web:
+    - type: A
+      name: "@"
+      value: "203.0.113.10"
+      ttl: ${ttl}
+  mail:
+    - type: MX
+      name: "@"
+      value: "mail.${domain}"
+      priority: 10
+      ttl: ${ttl}
+
+# Environment overrides
+environments:
+  production:
+    variables:
+      ttl: 3600
+  staging:
+    variables:
+      ttl: 300
+      domain: "staging.example.com"
+```
+
+### Using Templates
+
+1. Create a template file (see `template.yaml-example` for a complete example):
+```bash
+cp template.yaml-example my-domain-template.yaml
+```
+
+2. Apply template to a domain:
+```python
+from dns_services_gateway import DNSServicesClient
+
+async with DNSServicesClient() as client:
+    # Load and validate template
+    template = await client.load_template("my-domain-template.yaml")
+
+    # Apply template with dry-run
+    result = await client.apply_template(
+        template,
+        environment="production",
+        dry_run=True
+    )
+
+    # Apply template if dry-run looks good
+    if result.is_valid:
+        await client.apply_template(
+            template,
+            environment="production",
+            dry_run=False
+        )
+```
+
+### Template Best Practices
+
+1. **Version Your Templates**: Always include version information in template metadata
+2. **Use Variables**: Make templates reusable by using variables for common values
+3. **Group Records**: Organize records by purpose (web, mail, security, etc.)
+4. **Include Documentation**: Add descriptions to records and document template purpose
+5. **Test Changes**: Always use dry-run before applying templates
+6. **Back Up Records**: Enable backup feature in template settings
+7. **Environment Separation**: Use environment-specific overrides for different stages
+
+### Safety Features
+
+Templates include several safety features:
+- Pre-application validation
+- Automatic backup of existing records
+- Rollback capability
+- Change logging
+- Conflict detection
+- Version compatibility checking
+
+For more details and examples, see the [Template Documentation](docs/templates.md).
 
 ## Installation
 
@@ -211,7 +318,6 @@ verified = await records_manager.verify_record(
     record=a_record,
     timeout=60  # Wait up to 60 seconds
 )
-```
 
 ## API Documentation
 
