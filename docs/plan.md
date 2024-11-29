@@ -138,7 +138,7 @@ Python Version: 3.12.3
 
 ### Phase 8: Additional Features
 - [x] Implement Basic Authentication support
-- [ ] Add endpoint for Get Domain Details by Name
+- [x] Add endpoint for Get Domain Details by Name
 - [ ] Implement Get and Update Domain Nameservers
 - [ ] Add Register Domain Nameservers feature
 - [ ] Ensure List DNS Records operation is included
@@ -146,6 +146,29 @@ Python Version: 3.12.3
 - [ ] List Available TLDs
 - [ ] Implement Order and Renew Domain operations
 - [ ] Add DNSSEC Management: List, Add, and Remove DNSSEC Keys
+
+### Phase 9: API Coverage Completion
+- [ ] Implement bulk domain listing with metadata endpoint
+- [ ] Add DNS record creation endpoint
+- [ ] Add DNS record deletion endpoint
+- [ ] Implement batch operations for DNS records
+- [ ] Add record type-specific validation (A, AAAA, CNAME, MX, TXT)
+- [ ] Create record verification system
+- [ ] Implement Get and Update Domain Nameservers endpoints
+- [ ] Add Register Domain Nameservers endpoint
+- [ ] Create List DNS Records operation
+- [ ] Implement Domain Availability check
+- [ ] Add List Available TLDs endpoint
+- [ ] Create Order Domain operation
+- [ ] Create Renew Domain operation
+- [ ] Implement DNSSEC Management:
+  - [ ] List DNSSEC Keys
+  - [ ] Add DNSSEC Keys
+  - [ ] Remove DNSSEC Keys
+- [ ] Add expiration dates to domain metadata
+- [ ] Implement comprehensive nameserver management
+- [ ] Add domain forwarding management
+- [ ] Create registry lock status endpoints
 
 ## Development Environment
 

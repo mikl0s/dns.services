@@ -65,14 +65,22 @@ async def test_get_domain_details(domain_ops, mock_client):
     }
     mock_client.get.return_value = mock_response
 
+    # Test with domain name
     response = await domain_ops.get_domain_details("example.com")
-    assert response is not None  # Ensure method call
-
+    assert response is not None
     assert isinstance(response, OperationResponse)
     assert response.status == "success"
     assert response.operation == "read"
     assert response.data["domain"]["name"] == "example.com"
-    mock_client.get.assert_called_once_with("/domains/example.com")
+    assert "domain_identifier" in response.metadata
+    assert "retrieved_at" in response.metadata
+    mock_client.get.assert_called_with("/domain/example.com")
+
+    # Test with domain ID
+    mock_client.get.reset_mock()
+    response = await domain_ops.get_domain_details("domain1")
+    assert response.data["domain"]["id"] == "domain1"
+    mock_client.get.assert_called_with("/domain/domain1")
 
 
 async def test_verify_domain(domain_ops, mock_client):
@@ -140,11 +148,11 @@ async def test_list_domains_edge_case(domain_ops, mock_client):
 
 async def test_get_domain_details_invalid(domain_ops, mock_client):
     """Test getting domain details with invalid domain name."""
-    mock_client.get.side_effect = Exception("Domain not found")
+    mock_client.get.side_effect = APIError("Domain not found")
 
     with pytest.raises(APIError):
         await domain_ops.get_domain_details("invalid.com")
-    mock_client.get.assert_called_once_with("/domains/invalid.com")
+    mock_client.get.assert_called_once_with("/domain/invalid.com")
 
 
 async def test_verify_domain_failure(domain_ops, mock_client):

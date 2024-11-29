@@ -1,5 +1,6 @@
 """Domain operations for DNS Services Gateway."""
 
+from datetime import datetime, timezone
 from .models import DomainInfo, OperationResponse
 from .exceptions import APIError
 
@@ -50,28 +51,35 @@ class DomainOperations:
         except Exception as e:
             raise APIError(f"Failed to list domains: {str(e)}")
 
-    async def get_domain_details(self, domain_name: str) -> OperationResponse:
+    async def get_domain_details(self, domain_identifier: str) -> OperationResponse:
         """Get detailed information for a specific domain.
 
         Args:
-            domain_name: Name of the domain to fetch details for
+            domain_identifier: Domain ID or domain name to fetch details for
 
         Returns:
-            OperationResponse containing domain details
+            OperationResponse containing domain details including:
+            - Domain registration status
+            - Expiration dates
+            - DNS configuration
+            - Nameserver details
 
         Raises:
             APIError: If the API request fails
         """
         print("get_domain_details called")
         try:
-            response = await self._client.get(f"/domains/{domain_name}")
+            response = await self._client.get(f"/domain/{domain_identifier}")
             domain_info = DomainInfo(**response)
 
             return OperationResponse(
                 status="success",
                 operation="read",
                 data={"domain": domain_info.model_dump()},
-                metadata={"domain_name": domain_name},
+                metadata={
+                    "domain_identifier": domain_identifier,
+                    "retrieved_at": datetime.now(timezone.utc),
+                },
             )
         except Exception as e:
             raise APIError(f"Failed to get domain details: {str(e)}")
