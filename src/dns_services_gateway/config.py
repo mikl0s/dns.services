@@ -55,13 +55,25 @@ class DNSServicesConfig(BaseModel):
                 raise ConfigurationError(f"Environment file not found: {env_file}")
             load_dotenv(env_file)
 
+        # Get required fields first
+        username = os.getenv("DNS_SERVICES_USERNAME")
+        password = os.getenv("DNS_SERVICES_PASSWORD")
+
+        if not username or not password:
+            raise ConfigurationError(
+                "Missing required environment variables: "
+                "DNS_SERVICES_USERNAME and DNS_SERVICES_PASSWORD must be set"
+            )
+
         try:
+            token_path_str = os.getenv("DNS_SERVICES_TOKEN_PATH")
             return cls(
-                username=os.getenv("DNS_SERVICES_USERNAME", ""),
-                password=SecretStr(os.getenv("DNS_SERVICES_PASSWORD", "")),
+                username=username,
+                password=SecretStr(password),
                 base_url=os.getenv("DNS_SERVICES_BASE_URL", "https://dns.services"),
-                token_path=os.getenv("DNS_SERVICES_TOKEN_PATH"),
-                verify_ssl=os.getenv("DNS_SERVICES_VERIFY_SSL", "true").lower() == "true",
+                token_path=Path(token_path_str) if token_path_str else None,
+                verify_ssl=os.getenv("DNS_SERVICES_VERIFY_SSL", "true").lower()
+                == "true",
                 timeout=int(os.getenv("DNS_SERVICES_TIMEOUT", "30")),
                 debug=os.getenv("DNS_SERVICES_DEBUG", "false").lower() == "true",
             )

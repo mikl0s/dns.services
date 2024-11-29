@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 
 import requests
@@ -47,9 +47,13 @@ class DNSServicesClient:
 
         try:
             data = json.loads(token_path.read_text())
+            # Handle both 'expiration' and 'expires' fields for backward compatibility
+            expires_str = data.get("expires") or data.get("expiration")
+            if not expires_str:
+                raise KeyError("No expiration field found")
             return AuthResponse(
                 token=data["token"],
-                expires=datetime.fromisoformat(data["expires"]),
+                expires=datetime.fromisoformat(expires_str),
                 refresh_token=data.get("refresh_token"),
             )
         except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -66,11 +70,16 @@ class DNSServicesClient:
         if not token_path:
             return
 
+        if not auth.expires:
+            auth.expires = datetime.now(timezone.utc).replace(
+                microsecond=0
+            ) + timedelta(hours=1)
+
         token_path.write_text(
             json.dumps(
                 {
                     "token": auth.token,
-                    "expires": auth.expires.isoformat(),
+                    "expiration": auth.expiration or auth.expires.isoformat(),
                     "refresh_token": auth.refresh_token,
                 }
             )
@@ -88,7 +97,7 @@ class DNSServicesClient:
         # Try to load existing token first
         auth = self._load_token()
         now = datetime.now(timezone.utc).replace(microsecond=0)
-        if not force and auth and auth.expires > now:
+        if not force and auth and auth.expires and auth.expires > now:
             self._token = auth.token
             self._token_expires = auth.expires
             return
@@ -109,10 +118,9 @@ class DNSServicesClient:
             response.raise_for_status()
             data = response.json()
 
-            # Parse and normalize the expiry time
-            if "expires" in data:
-                expires = datetime.fromisoformat(data["expires"]).replace(microsecond=0)
-                data["expires"] = expires.isoformat()
+            # Handle both expiration and expires fields
+            if "expiration" in data and "expires" not in data:
+                data["expires"] = data["expiration"]
 
             # Create and validate the auth response
             auth = AuthResponse(**data)
@@ -138,7 +146,8 @@ class DNSServicesClient:
             AuthenticationError: If authentication fails
         """
         now = datetime.now(timezone.utc).replace(microsecond=0)
-        if not self._token or (self._token_expires and self._token_expires <= now):
+        # Check if token is expired
+        if not self._token or not self._token_expires or self._token_expires < now:
             self.authenticate()
 
         return {
@@ -196,10 +205,12 @@ class DNSServicesClient:
                         response_body={"error": e.response.text},
                     )
                 elif e.response.status_code >= 400:
+                    # Correctly parse the response body as JSON
+                    response_body = json.loads(e.response.text)
                     raise APIError(
                         "Client error",
                         status_code=e.response.status_code,
-                        response_body={"error": e.response.text},
+                        response_body=response_body,
                     )
                 else:
                     raise APIError(

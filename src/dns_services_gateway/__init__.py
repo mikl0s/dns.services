@@ -1,25 +1,26 @@
-"""DNS Services Gateway - A Python client for managing DNS records via DNS.services API."""
+"""DNS Services Gateway client library.
 
-__version__ = "0.2.3"
+This package provides a Python client for interacting with the DNS.services API.
+It handles authentication, token management, and provides a clean interface for
+making API requests.
+"""
+
+__version__ = "0.1.0"
 __author__ = "DNS Services Gateway Contributors"
 __license__ = "MIT"
 
-from .config import DNSServicesConfig
-from .client import DNSServicesClient
-from .exceptions import (
-    DNSServicesError,
+from dns_services_gateway.client import DNSServicesClient
+from dns_services_gateway.config import DNSServicesConfig
+from dns_services_gateway.exceptions import (
     AuthenticationError,
-    ConfigurationError,
-    ValidationError,
-    APIError,
+    TokenError,
+    TokenVerificationError,
 )
 
 __all__ = [
     "DNSServicesClient",
     "DNSServicesConfig",
-    "DNSServicesError",
     "AuthenticationError",
-    "ConfigurationError",
-    "ValidationError",
-    "APIError",
+    "TokenError",
+    "TokenVerificationError",
 ]

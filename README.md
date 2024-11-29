@@ -144,3 +144,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - DNS.services for providing the API
 - All contributors who have helped with the project
+- Windsurf Editor & Claude 3.5 Sonnet

@@ -1,6 +1,5 @@
 """Test configuration management."""
 
-import os
 import pytest
 from pathlib import Path
 from dns_services_gateway.config import DNSServicesConfig

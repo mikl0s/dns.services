@@ -1,8 +1,8 @@
 """Data models for DNS Services Gateway."""
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class DNSRecord(BaseModel):
@@ -16,15 +16,21 @@ class DNSRecord(BaseModel):
     priority: Optional[int] = Field(None, description="Record priority (MX, SRV)")
     proxied: bool = Field(False, description="Whether the record is proxied")
 
+    model_config = ConfigDict(extra="allow")
+
 
 class OperationResponse(BaseModel):
     """API operation response model."""
 
     status: str = Field(..., description="Operation status (success/error)")
-    operation: str = Field(..., description="Operation type (create/read/update/delete)")
+    operation: str = Field(
+        ..., description="Operation type (create/read/update/delete)"
+    )
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     data: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="allow")
 
 
 class DomainInfo(BaseModel):
@@ -38,10 +44,33 @@ class DomainInfo(BaseModel):
     nameservers: List[str] = Field(default_factory=list)
     records: List[DNSRecord] = Field(default_factory=list)
 
+    model_config = ConfigDict(extra="allow")
+
 
 class AuthResponse(BaseModel):
     """Authentication response model."""
 
-    token: str = Field(..., description="JWT token")
-    expires: datetime = Field(..., description="Token expiration timestamp")
-    refresh_token: Optional[str] = Field(None, description="Refresh token if available")
+    token: Optional[str] = None
+    expires: Optional[datetime] = None
+    refresh_token: Optional[str] = None
+    expiration: Optional[str] = None
+
+    model_config = ConfigDict(extra="allow")
+
+    @field_validator("expires", mode="before")
+    @classmethod
+    def set_expiration(cls, v, info):
+        """Set expiration to 1 hour from now if not provided."""
+        if not v:
+            # Check if expiration is provided in the raw data
+            raw_data = info.data
+            if "expiration" in raw_data:
+                v = raw_data["expiration"]
+                # Store the original expiration string
+                info.data["expiration"] = v
+
+        if isinstance(v, str):
+            return datetime.fromisoformat(v).replace(microsecond=0)
+        elif isinstance(v, datetime):
+            return v.replace(microsecond=0)
+        return datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
