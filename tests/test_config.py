@@ -5,6 +5,7 @@ import pytest
 from dns_services_gateway.config import DNSServicesConfig
 from dns_services_gateway.exceptions import ConfigurationError
 from pathlib import Path
+from unittest import mock
 
 
 @pytest.fixture
@@ -98,10 +99,11 @@ DNS_SERVICES_DEBUG=true
 
 def test_config_from_env_missing_required():
     """Test error when required environment variables are missing."""
-    with pytest.raises(
-        ConfigurationError, match="Missing required environment variables"
-    ):
-        DNSServicesConfig.from_env()
+    with mock.patch.dict(os.environ, {}, clear=True):
+        with pytest.raises(
+            ConfigurationError, match="Missing required environment variables"
+        ):
+            DNSServicesConfig.from_env()
 
 
 def test_config_from_env_invalid_timeout(env_vars):
