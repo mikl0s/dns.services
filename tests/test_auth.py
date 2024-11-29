@@ -174,3 +174,73 @@ def test_load_token_invalid_format(tmp_path):
 
     with pytest.raises(TokenError, match="Invalid token file format"):
         TokenManager.load_token(token_path)
+
+
+def test_basic_auth_header_generation():
+    """Test Basic Authentication header generation."""
+    from dns_services_gateway.client import DNSServicesClient
+    from dns_services_gateway.config import DNSServicesConfig, AuthType
+    import base64
+
+    config = DNSServicesConfig(
+        username="testuser", password="testpass", auth_type=AuthType.BASIC
+    )
+    client = DNSServicesClient(config)
+    headers = client._get_headers()
+    auth_header = headers["Authorization"]
+    assert auth_header.startswith("Basic ")
+    encoded_creds = auth_header.split(" ")[1]
+    decoded_creds = base64.b64decode(encoded_creds).decode()
+    assert decoded_creds == "testuser:testpass"
+
+
+def test_basic_auth_request():
+    """Test that Basic Authentication is used in requests."""
+    from dns_services_gateway.client import DNSServicesClient
+    from dns_services_gateway.config import DNSServicesConfig, AuthType
+    import base64
+
+    config = DNSServicesConfig(
+        username="testuser", password="testpass", auth_type=AuthType.BASIC
+    )
+    client = DNSServicesClient(config)
+
+    with mock.patch("requests.Session.request") as mock_request:
+        mock_response = mock.Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "success"}
+        mock_response.raise_for_status.return_value = None
+        mock_request.return_value = mock_response
+
+        client._request("GET", "/test")
+
+        call_args = mock_request.call_args
+        headers = call_args.kwargs["headers"]
+        auth_header = headers["Authorization"]
+        assert auth_header.startswith("Basic ")
+        encoded_creds = auth_header.split(" ")[1]
+        decoded_creds = base64.b64decode(encoded_creds).decode()
+        assert decoded_creds == "testuser:testpass"
+
+
+def test_auth_type_switching():
+    """Test switching between JWT and Basic auth."""
+    from dns_services_gateway.client import DNSServicesClient
+    from dns_services_gateway.config import DNSServicesConfig, AuthType
+
+    basic_config = DNSServicesConfig(
+        username="testuser", password="testpass", auth_type=AuthType.BASIC
+    )
+    basic_client = DNSServicesClient(basic_config)
+    basic_headers = basic_client._get_headers()
+    assert basic_headers["Authorization"].startswith("Basic ")
+
+    jwt_config = DNSServicesConfig(
+        username="testuser", password="testpass", auth_type=AuthType.JWT
+    )
+    jwt_client = DNSServicesClient(jwt_config)
+    with mock.patch.object(jwt_client, "authenticate"):
+        jwt_client._token = "test_jwt_token"
+        jwt_client._token_expires = datetime.now(timezone.utc) + timedelta(hours=1)
+        jwt_headers = jwt_client._get_headers()
+        assert jwt_headers["Authorization"].startswith("Bearer ")
