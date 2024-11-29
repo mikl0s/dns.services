@@ -2,13 +2,14 @@
 
 import json
 import logging
+import base64
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 
 import requests
 from requests.exceptions import RequestException
 
-from .config import DNSServicesConfig
+from .config import DNSServicesConfig, AuthType
 from .exceptions import AuthenticationError, APIError
 from .models import AuthResponse
 
@@ -85,6 +86,43 @@ class DNSServicesClient:
             )
         )
 
+    def _get_basic_auth_header(self) -> str:
+        """Get Basic Authentication header value.
+
+        Returns:
+            str: Base64 encoded credentials
+        """
+        credentials = (
+            f"{self.config.username}:{self.config.password.get_secret_value()}"
+        )
+        encoded = base64.b64encode(credentials.encode()).decode()
+        return f"Basic {encoded}"
+
+    def _get_headers(self) -> Dict[str, str]:
+        """Get request headers with authentication.
+
+        Returns:
+            Dict[str, str]: Request headers
+
+        Raises:
+            AuthenticationError: If authentication fails
+        """
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        if self.config.auth_type == AuthType.BASIC:
+            headers["Authorization"] = self._get_basic_auth_header()
+        else:  # JWT auth
+            now = datetime.now(timezone.utc).replace(microsecond=0)
+            # Check if token is expired
+            if not self._token or not self._token_expires or self._token_expires < now:
+                self.authenticate()
+            headers["Authorization"] = f"Bearer {self._token}"
+
+        return headers
+
     def authenticate(self, force: bool = False) -> None:
         """Authenticate with the API.
 
@@ -94,7 +132,11 @@ class DNSServicesClient:
         Raises:
             AuthenticationError: If authentication fails
         """
-        # Try to load existing token first
+        if self.config.auth_type == AuthType.BASIC:
+            # Basic auth doesn't require token authentication
+            return
+
+        # JWT authentication
         auth = self._load_token()
         now = datetime.now(timezone.utc).replace(microsecond=0)
         if not force and auth and auth.expires and auth.expires > now:
@@ -135,26 +177,6 @@ class DNSServicesClient:
                 "Authentication failed",
                 details={"error": str(e)},
             ) from e
-
-    def _get_headers(self) -> Dict[str, str]:
-        """Get request headers with authentication.
-
-        Returns:
-            Dict[str, str]: Request headers
-
-        Raises:
-            AuthenticationError: If authentication fails
-        """
-        now = datetime.now(timezone.utc).replace(microsecond=0)
-        # Check if token is expired
-        if not self._token or not self._token_expires or self._token_expires < now:
-            self.authenticate()
-
-        return {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
 
     def _request(
         self,
