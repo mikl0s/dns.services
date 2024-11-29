@@ -209,6 +209,7 @@ verified = await records_manager.verify_record(
     record=a_record,
     timeout=60  # Wait up to 60 seconds
 )
+```
 
 ## API Documentation
 
