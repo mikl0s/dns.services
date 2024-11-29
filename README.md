@@ -214,8 +214,8 @@ verified = await records_manager.verify_record(
 ## API Documentation
 
 For detailed API documentation and examples, please see:
-- [API Reference](docs/DNS_services_API_Reference.md)
-- [Authentication Guide](docs/doc-api.md)
+- [API Reference](docs/reduced-scope-swagger.json)
+- [DNS.Services API page](https://dns.services/userapi?python#)
 
 ## Known Issues
 
