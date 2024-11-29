@@ -9,7 +9,10 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
 
 ## Features
 
-- 🔐 Secure JWT token-based authentication
+- 🔐 Flexible Authentication
+  - JWT token-based authentication
+  - Basic Authentication support
+  - Automatic token refresh handling
 - 🌍 Comprehensive domain management
   - List domains
   - Fetch domain details
@@ -21,7 +24,6 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
   - Record validation and verification
   - TTL management
 - 🎨 Beautiful CLI with colored output and progress indicators
-- 🔄 Automatic token refresh handling
 - ⚡ Efficient bulk operations support
 - 🛡️ Built-in error handling and validation
 - 📘 Comprehensive documentation with docstrings
@@ -74,6 +76,7 @@ export DNS_SERVICES_TOKEN_PATH="~/.dns-services/token"  # JWT token storage
 export DNS_SERVICES_VERIFY_SSL="true"  # Enable/disable SSL verification
 export DNS_SERVICES_TIMEOUT="30"  # API timeout in seconds
 export DNS_SERVICES_DEBUG="false"  # Enable debug logging
+export DNS_SERVICES_AUTH_TYPE="JWT"  # Authentication type: JWT or BASIC
 ```
 
 Or create a `.env` file (see `.env.example`).
@@ -81,12 +84,20 @@ Or create a `.env` file (see `.env.example`).
 ### Examples
 
 ```python
-from dns_services_gateway import DNSServicesClient, DNSServicesConfig
+from dns_services_gateway import DNSServicesClient, DNSServicesConfig, AuthType
 from dns_services_gateway.records import ARecord, MXRecord, RecordAction
 
-# Create client
+# Create client with JWT authentication (default)
 config = DNSServicesConfig.from_env()
 client = DNSServicesClient(config)
+
+# Or use Basic Authentication
+basic_config = DNSServicesConfig(
+    username="your_username",
+    password="your_password",
+    auth_type=AuthType.BASIC
+)
+basic_client = DNSServicesClient(basic_config)
 
 # List domains
 response = await client.list_domains()

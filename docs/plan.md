@@ -73,6 +73,7 @@ Python Version: 3.12.3
   DNS_SERVICES_VERIFY_SSL="true"  # Optional: SSL verification
   DNS_SERVICES_TIMEOUT="30"  # Optional: API timeout in seconds
   DNS_SERVICES_DEBUG="false"  # Optional: Enable debug logging
+  DNS_SERVICES_AUTH_TYPE="JWT"  # Optional: Authentication type (JWT or BASIC)
   ```
 - Environment validation on startup
 - Secure token storage
@@ -136,7 +137,7 @@ Python Version: 3.12.3
 - [x] Implement timezone-aware datetime handling
 
 ### Phase 8: Additional Features
-- [ ] Implement Basic Authentication support
+- [x] Implement Basic Authentication support
 - [ ] Add endpoint for Get Domain Details by Name
 - [ ] Implement Get and Update Domain Nameservers
 - [ ] Add Register Domain Nameservers feature
