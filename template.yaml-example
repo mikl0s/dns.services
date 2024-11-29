@@ -1,0 +1,174 @@
+---
+# DNS Services Gateway Template Example
+# Version: 1.0.0
+# This template demonstrates common DNS configurations for a domain
+
+# Template metadata
+metadata:
+  version: "1.0.0"
+  description: "Common web, security, and mail configuration for example.com"
+  author: "DNS Services Gateway"
+  date: "2024-01-01"
+
+# Variables that can be substituted
+variables:
+  domain: "example.com"
+  ttl: 3600
+  mail_priority: 10
+  spf_record: "v=spf1 include:_spf.google.com include:_spf.protonmail.ch ~all"
+  dmarc_policy: "v=DMARC1; p=reject; rua=mailto:dmarc@${domain}; aspf=s; adkim=s;"
+
+# Zone-level defaults
+defaults:
+  ttl: ${ttl}
+  soa:
+    primary_ns: "ns1.${domain}"
+    contact: "hostmaster@${domain}"
+    refresh: 7200
+    retry: 3600
+    expire: 1209600
+    minimum: 3600
+
+# Record groups by purpose
+records:
+  # Web server configuration
+  web:
+    - type: A
+      name: "@"
+      value: "203.0.113.10"
+      ttl: ${ttl}
+      description: "Main website IPv4"
+
+    - type: AAAA
+      name: "@"
+      value: "2001:db8::10"
+      ttl: ${ttl}
+      description: "Main website IPv6"
+
+    - type: A
+      name: "www"
+      value: "203.0.113.10"
+      ttl: ${ttl}
+      description: "WWW website IPv4"
+
+    - type: AAAA
+      name: "www"
+      value: "2001:db8::10"
+      ttl: ${ttl}
+      description: "WWW website IPv6"
+
+    - type: CNAME
+      name: "blog"
+      value: "ghs.google.com"
+      ttl: ${ttl}
+      description: "Blog hosted on Blogger"
+
+  # Email configuration
+  mail:
+    - type: MX
+      name: "@"
+      value: "aspmx.l.google.com"
+      priority: ${mail_priority}
+      ttl: ${ttl}
+      description: "Primary mail exchanger"
+
+    - type: MX
+      name: "@"
+      value: "alt1.aspmx.l.google.com"
+      priority: 20
+      ttl: ${ttl}
+      description: "Secondary mail exchanger 1"
+
+    - type: MX
+      name: "@"
+      value: "alt2.aspmx.l.google.com"
+      priority: 30
+      ttl: ${ttl}
+      description: "Secondary mail exchanger 2"
+
+    - type: TXT
+      name: "@"
+      value: ${spf_record}
+      ttl: ${ttl}
+      description: "SPF record"
+
+    - type: TXT
+      name: "_dmarc"
+      value: ${dmarc_policy}
+      ttl: ${ttl}
+      description: "DMARC policy"
+
+    - type: CNAME
+      name: "mail"
+      value: "ghs.google.com"
+      ttl: ${ttl}
+      description: "Webmail access"
+
+  # Security configuration
+  security:
+    - type: CAA
+      name: "@"
+      value: "0 issue \"letsencrypt.org\""
+      ttl: ${ttl}
+      description: "CAA record for Let's Encrypt"
+
+    - type: CAA
+      name: "@"
+      value: "0 issuewild \"letsencrypt.org\""
+      ttl: ${ttl}
+      description: "CAA record for Let's Encrypt wildcard"
+
+    - type: TXT
+      name: "_github-challenge"
+      value: "your-verification-code"
+      ttl: ${ttl}
+      description: "GitHub domain verification"
+
+  # Service discovery
+  services:
+    - type: SRV
+      name: "_sip._tcp"
+      value: "0 5 5060 sip.${domain}"
+      ttl: ${ttl}
+      description: "SIP service"
+
+    - type: SRV
+      name: "_xmpp-server._tcp"
+      value: "0 5 5269 xmpp.${domain}"
+      ttl: ${ttl}
+      description: "XMPP server"
+
+# Environment-specific overrides
+environments:
+  production:
+    variables:
+      ttl: 3600
+
+  staging:
+    variables:
+      ttl: 300
+      domain: "staging.example.com"
+
+  development:
+    variables:
+      ttl: 60
+      domain: "dev.example.com"
+
+# Nameserver configuration
+nameservers:
+  - ns1.${domain}
+  - ns2.${domain}
+  - ns3.${domain}
+  - ns4.${domain}
+
+# Template settings
+settings:
+  backup:
+    enabled: true
+    retention: 30  # days
+  validation:
+    strict: true
+    check_existing: true
+  rollback:
+    enabled: true
+    automatic: false
