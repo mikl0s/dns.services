@@ -1,6 +1,7 @@
 """Domain operations for DNS Services Gateway."""
 
 from datetime import datetime, timezone
+from typing import Optional, Dict, Any
 from .models import (
     DomainInfo,
     OperationResponse,
@@ -8,6 +9,7 @@ from .models import (
     DomainAvailabilityResponse,
     TLDInfo,
     TLDListResponse,
+    BulkDomainListResponse,
 )
 from .exceptions import APIError
 
@@ -24,39 +26,67 @@ class DomainOperations:
         self._client = client
 
     async def list_domains(
-        self, page: int = 1, per_page: int = 20
-    ) -> OperationResponse:
+        self,
+        page: int = 1,
+        per_page: int = 20,
+        include_metadata: bool = True,
+        filters: Optional[Dict[str, Any]] = None,
+    ) -> BulkDomainListResponse:
         """List all domains with metadata.
 
         Args:
             page: Page number for pagination
             per_page: Number of items per page
+            include_metadata: Whether to include detailed metadata
+            filters: Optional filters to apply (e.g., status, expiring_within_days)
 
         Returns:
-            OperationResponse containing list of domains with metadata
+            BulkDomainListResponse containing list of domains with metadata
 
         Raises:
             APIError: If the API request fails
         """
-        print("list_domains called")
         try:
-            response = await self._client.get(
-                "/domains", params={"page": page, "per_page": per_page}
-            )
-            domains = [DomainInfo(**domain) for domain in response.get("domains", [])]
+            params = {
+                "page": page,
+                "per_page": per_page,
+                "include_metadata": "1" if include_metadata else "0",
+            }
+            if filters:
+                params.update(filters)
 
-            return OperationResponse(
-                status="success",
-                operation="read",
-                data={"domains": [domain.model_dump() for domain in domains]},
+            response = await self._client.get("/domains/list", params=params)
+
+            domains = []
+            for domain_data in response.get("domains", []):
+                # Extract expiration date if available
+                if "expires_at" in domain_data:
+                    domain_data["expires"] = datetime.fromisoformat(
+                        domain_data["expires_at"]
+                    )
+
+                # Add domain metadata
+                if include_metadata and "metadata" in domain_data:
+                    domain_data.update(domain_data.pop("metadata"))
+
+                domains.append(DomainInfo(**domain_data))
+
+            return BulkDomainListResponse(
+                domains=domains,
+                total=response.get("total", len(domains)),
+                page=page,
+                per_page=per_page,
+                has_more=response.get("has_more", False),
                 metadata={
-                    "total": response.get("total", 0),
-                    "page": page,
-                    "per_page": per_page,
+                    "query_time": response.get("query_time"),
+                    "filtered": bool(filters),
+                    "filter_criteria": filters,
                 },
+                timestamp=datetime.now(timezone.utc),
             )
+
         except Exception as e:
-            raise APIError(f"Failed to list domains: {str(e)}")
+            raise APIError(f"Failed to list domains: {str(e)}") from e
 
     async def get_domain_details(self, domain_identifier: str) -> OperationResponse:
         """Get detailed information for a specific domain.

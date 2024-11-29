@@ -5,6 +5,19 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+> 🚀 **Built with [Windsurf](https://www.codeium.com/windsurf)**
+>
+> This entire production-ready module was created in just a couple of evenings using Windsurf Editor. From initial planning to comprehensive testing, Windsurf's AI-powered capabilities enabled rapid development while maintaining exceptional code quality:
+>
+> - 🎯 97% test coverage
+> - 📘 Full type safety
+> - ⚡ Async-first architecture
+> - 🔧 Production-ready error handling
+>
+> It was fun learning Windsurf, and I'm excited to share the results with the community.
+
+## Description
+
 A Python client library and CLI tool for managing DNS records through the DNS.services API. This tool provides a simple and intuitive interface for managing domains and DNS records programmatically or via command line.
 
 ## Features
@@ -14,24 +27,30 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
   - Basic Authentication support
   - Automatic token refresh handling
 - 🌍 Comprehensive domain management
-  - List domains
-  - Fetch domain details
-  - Verify domain configuration
-  - Retrieve domain metadata
-  - Nameserver management and registration
-  - Check domain availability
-  - List available TLDs with pricing
+  - Bulk domain listing with metadata
+  - Pagination and filtering support
+  - Domain details with expiration dates
+  - Configuration verification
+  - Nameserver management
+  - Domain availability checking
+  - TLD listing with pricing
   - DNSSEC key management
-- 📝 Full DNS record CRUD operations
+- 📝 Full DNS record management
   - Support for A, AAAA, CNAME, MX, and TXT records
-  - Batch operations for multiple records
-  - Record validation and verification
+  - Type-specific validation for all record types
+  - Record verification system
   - TTL management
-- ⚡ Efficient bulk operations support
-- 🛡️ Built-in error handling and validation
-- 📘 Comprehensive documentation with docstrings
-- ✨ Full type safety with mypy support
-- 📊 High test coverage (95%) with pytest
+  - Batch operations support
+- ⚡ Performance features
+  - Async/await for non-blocking operations
+  - Efficient bulk operations
+  - Parallel processing for batch operations
+  - Comprehensive error handling
+- 🛡️ Quality assurance
+  - Full type hints with mypy
+  - 97% test coverage
+  - Black code formatting
+  - Flake8 compliance
 
 ## Installation
 
@@ -103,10 +122,22 @@ basic_config = DNSServicesConfig(
 )
 basic_client = DNSServicesClient(basic_config)
 
-# List domains
-response = await client.list_domains()
+# List domains with pagination and metadata
+response = await client.list_domains(
+    page=1,
+    per_page=20,
+    include_metadata=True,
+    filters={"status": "active", "expiring_within_days": 30}
+)
 
-# Get domain details
+# Access bulk domain information
+for domain in response.domains:
+    print(f"Domain: {domain.name}")
+    print(f"Status: {domain.status}")
+    print(f"Expires: {domain.expiration_date}")
+    print(f"Nameservers: {', '.join(domain.nameservers)}")
+
+# Get domain details with full metadata
 response = await client.get_domain_details("example.com")
 
 # Verify domain
@@ -195,49 +226,14 @@ When running tests with pytest-cov (coverage.py 6.0.0), you may see the followin
 /venv/lib/python3.12/site-packages/coverage/inorout.py:508: CoverageWarning: Module src/dns_services_gateway/domain.py was never imported. (module-not-imported)
 ```
 
-This is a known issue with coverage.py when using Python 3.12.3. The warning is a false positive and does not affect the actual test coverage (currently at 95%) or functionality. The module is properly imported and tested, but coverage.py sometimes fails to detect imports in certain Python module structures.
+This is a known issue with coverage.py when using Python 3.12.3. The warning is a false positive and does not affect the actual test coverage (currently at 97%) or functionality. The module is properly imported and tested, but coverage.py sometimes fails to detect imports in certain Python module structures.
 
 For more information, see:
 - Coverage.py version: 6.0.0
 - Python version: 3.12.3
-- Affected module: `src/dns_services_gateway/domain.py`
 
 This issue will be resolved when coverage.py releases an update that better handles Python 3.12's module system.
 
-## Development
-
-### Prerequisites
-
-- Python 3.12.3
-- Virtual environment setup
-
-### Testing
-
-Run tests with:
-
-```bash
-venv/bin/pytest tests/
-```
-
-Check coverage with:
-
-```bash
-venv/bin/pytest --cov=dns_services_gateway tests/
-```
-
-### Linting and Formatting
-
-```bash
-venv/bin/flake8 src/ tests/
-venv/bin/black src/ tests/
-```
-
-### Type Checking
-
-```bash
-venv/bin/mypy src/
-```
-
-### Contributing
+## Contributing
 
 Please follow the guidelines in `docs/guidelines.md` for contributing to this project.

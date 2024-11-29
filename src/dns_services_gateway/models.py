@@ -199,3 +199,20 @@ class TLDListResponse(BaseModel):
     )
 
     model_config = ConfigDict(extra="allow")
+
+
+class BulkDomainListResponse(BaseModel):
+    """Response model for bulk domain listing."""
+
+    domains: List[DomainInfo] = Field(default_factory=list)
+    total: int = Field(..., description="Total number of domains")
+    page: int = Field(1, description="Current page number")
+    per_page: int = Field(20, description="Items per page")
+    has_more: bool = Field(False, description="Whether there are more pages")
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Timestamp of the response",
+    )
+
+    model_config = ConfigDict(extra="allow")

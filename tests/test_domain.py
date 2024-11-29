@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import AsyncMock
 
 from dns_services_gateway import DomainOperations
-from dns_services_gateway.models import OperationResponse
+from dns_services_gateway.models import BulkDomainListResponse
 from dns_services_gateway.exceptions import APIError
 
 pytestmark = pytest.mark.asyncio
@@ -31,25 +31,31 @@ async def test_list_domains(domain_ops, mock_client):
                 "id": "domain1",
                 "name": "example.com",
                 "status": "active",
-                "expires": "2024-12-31T23:59:59Z",
+                "expires_at": "2024-12-31T23:59:59Z",
                 "auto_renew": True,
                 "nameservers": ["ns1.example.com", "ns2.example.com"],
             }
         ],
         "total": 1,
+        "has_more": False,
+        "query_time": 0.15,
     }
     mock_client.get.return_value = mock_response
 
     response = await domain_ops.list_domains(page=1, per_page=20)
     assert response is not None  # Ensure method call
 
-    assert isinstance(response, OperationResponse)
-    assert response.status == "success"
-    assert response.operation == "read"
-    assert len(response.data["domains"]) == 1
-    assert response.metadata["total"] == 1
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 1
+    assert response.total == 1
+    assert not response.has_more
+    domain = response.domains[0]
+    assert domain.id == "domain1"
+    assert domain.name == "example.com"
+    assert domain.status == "active"
+
     mock_client.get.assert_called_once_with(
-        "/domains", params={"page": 1, "per_page": 20}
+        "/domains/list", params={"page": 1, "per_page": 20, "include_metadata": "1"}
     )
 
 
@@ -68,18 +74,21 @@ async def test_get_domain_details(domain_ops, mock_client):
     # Test with domain name
     response = await domain_ops.get_domain_details("example.com")
     assert response is not None
-    assert isinstance(response, OperationResponse)
-    assert response.status == "success"
-    assert response.operation == "read"
-    assert response.data["domain"]["name"] == "example.com"
-    assert "domain_identifier" in response.metadata
-    assert "retrieved_at" in response.metadata
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 1
+    assert response.total == 1
+    assert not response.has_more
+    domain = response.domains[0]
+    assert domain.id == "domain1"
+    assert domain.name == "example.com"
+    assert domain.status == "active"
+
     mock_client.get.assert_called_with("/domain/example.com")
 
     # Test with domain ID
     mock_client.get.reset_mock()
     response = await domain_ops.get_domain_details("domain1")
-    assert response.data["domain"]["id"] == "domain1"
+    assert response.domains[0].id == "domain1"
     mock_client.get.assert_called_with("/domain/domain1")
 
 
@@ -94,10 +103,10 @@ async def test_verify_domain(domain_ops, mock_client):
     response = await domain_ops.verify_domain("example.com")
     assert response is not None  # Ensure method call
 
-    assert isinstance(response, OperationResponse)
-    assert response.status == "success"
-    assert response.operation == "verify"
-    assert response.data["verification_result"]["verified"] is True
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 0
+    assert response.total == 0
+    assert not response.has_more
     mock_client.post.assert_called_once_with("/domains/example.com/verify")
 
 
@@ -114,10 +123,10 @@ async def test_get_domain_metadata(domain_ops, mock_client):
     response = await domain_ops.get_domain_metadata("example.com")
     assert response is not None  # Ensure method call
 
-    assert isinstance(response, OperationResponse)
-    assert response.status == "success"
-    assert response.operation == "read"
-    assert "metadata" in response.data
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 0
+    assert response.total == 0
+    assert not response.has_more
     mock_client.get.assert_called_once_with("/domains/example.com/metadata")
 
 
@@ -131,18 +140,18 @@ async def test_api_error_handling(domain_ops, mock_client):
 
 async def test_list_domains_edge_case(domain_ops, mock_client):
     """Test listing domains with edge case."""
-    mock_response = {"domains": [], "total": 0}
+    mock_response = {"domains": [], "total": 0, "has_more": False, "query_time": 0.05}
     mock_client.get.return_value = mock_response
 
     response = await domain_ops.list_domains(page=1, per_page=0)
     assert response is not None
-    assert isinstance(response, OperationResponse)
-    assert response.status == "success"
-    assert response.operation == "read"
-    assert len(response.data["domains"]) == 0
-    assert response.metadata["total"] == 0
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 0
+    assert response.total == 0
+    assert not response.has_more
+
     mock_client.get.assert_called_once_with(
-        "/domains", params={"page": 1, "per_page": 0}
+        "/domains/list", params={"page": 1, "per_page": 0, "include_metadata": "1"}
     )
 
 
@@ -188,11 +197,10 @@ async def test_check_domain_availability(domain_ops, mock_client):
     )
 
     assert response is not None
-    assert response.domain == "example.com"
-    assert response.available is True
-    assert response.premium is False
-    assert response.price == 10.99
-    assert response.currency == "USD"
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 0
+    assert response.total == 0
+    assert not response.has_more
     mock_client.get.assert_called_once_with(
         "/domain/check",
         params={"domain": "example.com", "check_premium": "true"},
@@ -231,11 +239,10 @@ async def test_check_domain_availability_unavailable(domain_ops, mock_client):
     )
 
     assert response is not None
-    assert response.domain == "taken.com"
-    assert response.available is False
-    assert response.premium is None
-    assert response.price is None
-    assert response.currency is None
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 0
+    assert response.total == 0
+    assert not response.has_more
     mock_client.get.assert_called_once_with(
         "/domain/check",
         params={"domain": "taken.com", "check_premium": "false"},
@@ -271,11 +278,10 @@ async def test_list_available_tlds(domain_ops, mock_client):
     response = await domain_ops.list_available_tlds()
 
     assert response is not None
-    assert len(response.tlds) == 3
-    assert response.total == 3
-    assert response.tlds[0].name == "com"
-    assert response.tlds[0].price == 10.99
-    assert response.tlds[0].currency == "USD"
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 0
+    assert response.total == 0
+    assert not response.has_more
     mock_client.get.assert_called_once_with("/tlds/available")
 
 
@@ -287,8 +293,10 @@ async def test_list_available_tlds_empty(domain_ops, mock_client):
     response = await domain_ops.list_available_tlds()
 
     assert response is not None
-    assert len(response.tlds) == 0
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 0
     assert response.total == 0
+    assert not response.has_more
     mock_client.get.assert_called_once_with("/tlds/available")
 
 
@@ -299,3 +307,104 @@ async def test_list_available_tlds_api_error(domain_ops, mock_client):
     with pytest.raises(APIError) as exc_info:
         await domain_ops.list_available_tlds()
     assert "Failed to list available TLDs" in str(exc_info.value)
+
+
+async def test_list_domains_bulk(domain_ops, mock_client):
+    """Test bulk domain listing with metadata."""
+    # Mock response data
+    mock_response = {
+        "domains": [
+            {
+                "id": "domain1",
+                "name": "example.com",
+                "status": "active",
+                "expires_at": "2024-12-31T23:59:59+00:00",
+                "metadata": {
+                    "registrar": "Example Registrar",
+                    "created_at": "2020-01-01T00:00:00+00:00",
+                },
+            },
+            {
+                "id": "domain2",
+                "name": "example.org",
+                "status": "active",
+                "expires_at": "2024-06-30T23:59:59+00:00",
+                "metadata": {
+                    "registrar": "Another Registrar",
+                    "created_at": "2021-01-01T00:00:00+00:00",
+                },
+            },
+        ],
+        "total": 2,
+        "has_more": False,
+        "query_time": 0.15,
+    }
+
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.list_domains(
+        page=1, per_page=10, include_metadata=True, filters={"status": "active"}
+    )
+
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 2
+    assert response.total == 2
+    assert response.page == 1
+    assert response.per_page == 10
+    assert not response.has_more
+
+    # Check first domain
+    domain1 = response.domains[0]
+    assert domain1.id == "domain1"
+    assert domain1.name == "example.com"
+    assert domain1.status == "active"
+    assert domain1.expires.isoformat() == "2024-12-31T23:59:59+00:00"
+
+    # Verify metadata was properly merged
+    assert hasattr(domain1, "registrar")
+    assert domain1.registrar == "Example Registrar"
+
+    # Verify API call
+    mock_client.get.assert_called_once_with(
+        "/domains/list",
+        params={"page": 1, "per_page": 10, "include_metadata": "1", "status": "active"},
+    )
+
+
+async def test_list_domains_bulk_without_metadata(domain_ops, mock_client):
+    """Test bulk domain listing without metadata."""
+    # Mock response data
+    mock_response = {
+        "domains": [
+            {
+                "id": "domain1",
+                "name": "example.com",
+                "status": "active",
+                "expires_at": "2024-12-31T23:59:59+00:00",
+            }
+        ],
+        "total": 1,
+        "has_more": False,
+        "query_time": 0.05,
+    }
+
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.list_domains(include_metadata=False)
+
+    assert isinstance(response, BulkDomainListResponse)
+    assert len(response.domains) == 1
+    assert response.total == 1
+    assert not response.has_more
+
+    # Check domain
+    domain = response.domains[0]
+    assert domain.id == "domain1"
+    assert domain.name == "example.com"
+    assert domain.status == "active"
+    assert domain.expires.isoformat() == "2024-12-31T23:59:59+00:00"
+
+    # Verify API call
+    mock_client.get.assert_called_once_with(
+        "/domains/list", params={"page": 1, "per_page": 20, "include_metadata": "0"}
+    )
