@@ -19,6 +19,8 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
   - Verify domain configuration
   - Retrieve domain metadata
   - Nameserver management and registration
+  - Check domain availability
+  - List available TLDs with pricing
 - 📝 Full DNS record CRUD operations
   - Support for A, AAAA, CNAME, MX, and TXT records
   - Batch operations for multiple records
@@ -111,6 +113,17 @@ response = await client.verify_domain("example.com")
 
 # Get domain metadata
 response = await client.get_domain_metadata("example.com")
+
+# Check domain availability
+response = await client.check_domain_availability(
+    domain="example.com",
+    check_premium=True  # Optional: check if domain is premium
+)
+
+# List available TLDs
+response = await client.list_available_tlds()
+for tld in response.tlds:
+    print(f"{tld.name}: {tld.price} {tld.currency}")
 
 # Manage DNS records
 records_manager = client.records

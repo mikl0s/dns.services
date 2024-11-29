@@ -142,8 +142,8 @@ Python Version: 3.12.3
 - [x] Implement Get and Update Domain Nameservers
 - [x] Add Register Domain Nameservers feature
 - [x] Ensure List DNS Records operation is included
-- [ ] Implement Domain Availability check
-- [ ] List Available TLDs
+- [x] Implement Domain Availability check
+- [x] List Available TLDs
 - [ ] Add DNSSEC Management: List, Add, and Remove DNSSEC Keys
 
 ### Phase 9: API Coverage Completion

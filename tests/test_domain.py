@@ -171,3 +171,131 @@ async def test_get_domain_metadata_failure(domain_ops, mock_client):
     with pytest.raises(APIError):
         await domain_ops.get_domain_metadata("example.com")
     mock_client.get.assert_called_once_with("/domains/example.com/metadata")
+
+
+async def test_check_domain_availability(domain_ops, mock_client):
+    """Test checking domain availability."""
+    mock_response = {
+        "available": True,
+        "premium": False,
+        "price": 10.99,
+        "currency": "USD",
+    }
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.check_domain_availability(
+        domain="example.com", check_premium=True
+    )
+
+    assert response is not None
+    assert response.domain == "example.com"
+    assert response.available is True
+    assert response.premium is False
+    assert response.price == 10.99
+    assert response.currency == "USD"
+    mock_client.get.assert_called_once_with(
+        "/domain/check",
+        params={"domain": "example.com", "check_premium": "true"},
+    )
+
+
+async def test_check_domain_availability_invalid_domain(domain_ops):
+    """Test checking domain availability with invalid domain."""
+    with pytest.raises(ValueError):
+        await domain_ops.check_domain_availability(domain="", check_premium=True)
+
+
+async def test_check_domain_availability_api_error(domain_ops, mock_client):
+    """Test API error handling for domain availability check."""
+    mock_client.get.side_effect = Exception("API Error")
+
+    with pytest.raises(APIError) as exc_info:
+        await domain_ops.check_domain_availability(
+            domain="example.com", check_premium=True
+        )
+    assert "Failed to check domain availability" in str(exc_info.value)
+
+
+async def test_check_domain_availability_unavailable(domain_ops, mock_client):
+    """Test checking availability for unavailable domain."""
+    mock_response = {
+        "available": False,
+        "premium": None,
+        "price": None,
+        "currency": None,
+    }
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.check_domain_availability(
+        domain="taken.com", check_premium=False
+    )
+
+    assert response is not None
+    assert response.domain == "taken.com"
+    assert response.available is False
+    assert response.premium is None
+    assert response.price is None
+    assert response.currency is None
+    mock_client.get.assert_called_once_with(
+        "/domain/check",
+        params={"domain": "taken.com", "check_premium": "false"},
+    )
+
+
+async def test_list_available_tlds(domain_ops, mock_client):
+    """Test listing available TLDs."""
+    mock_response = {
+        "tlds": [
+            {
+                "name": "com",
+                "available": True,
+                "price": 10.99,
+                "currency": "USD",
+            },
+            {
+                "name": "net",
+                "available": True,
+                "price": 9.99,
+                "currency": "USD",
+            },
+            {
+                "name": "org",
+                "available": True,
+                "price": 8.99,
+                "currency": "USD",
+            },
+        ],
+    }
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.list_available_tlds()
+
+    assert response is not None
+    assert len(response.tlds) == 3
+    assert response.total == 3
+    assert response.tlds[0].name == "com"
+    assert response.tlds[0].price == 10.99
+    assert response.tlds[0].currency == "USD"
+    mock_client.get.assert_called_once_with("/tlds/available")
+
+
+async def test_list_available_tlds_empty(domain_ops, mock_client):
+    """Test listing available TLDs when none are available."""
+    mock_response = {"tlds": []}
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.list_available_tlds()
+
+    assert response is not None
+    assert len(response.tlds) == 0
+    assert response.total == 0
+    mock_client.get.assert_called_once_with("/tlds/available")
+
+
+async def test_list_available_tlds_api_error(domain_ops, mock_client):
+    """Test API error handling for TLD listing."""
+    mock_client.get.side_effect = Exception("API Error")
+
+    with pytest.raises(APIError) as exc_info:
+        await domain_ops.list_available_tlds()
+    assert "Failed to list available TLDs" in str(exc_info.value)

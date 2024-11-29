@@ -1,7 +1,14 @@
 """Domain operations for DNS Services Gateway."""
 
 from datetime import datetime, timezone
-from .models import DomainInfo, OperationResponse
+from .models import (
+    DomainInfo,
+    OperationResponse,
+    DomainAvailabilityRequest,
+    DomainAvailabilityResponse,
+    TLDInfo,
+    TLDListResponse,
+)
 from .exceptions import APIError
 
 
@@ -133,3 +140,67 @@ class DomainOperations:
             )
         except Exception as e:
             raise APIError(f"Failed to get domain metadata: {str(e)}")
+
+    async def check_domain_availability(
+        self, domain: str, check_premium: bool = False
+    ) -> DomainAvailabilityResponse:
+        """Check domain name availability.
+
+        Args:
+            domain: Domain name to check
+            check_premium: Whether to check if domain is premium
+
+        Returns:
+            DomainAvailabilityResponse with availability status and pricing info
+
+        Raises:
+            APIError: If the API request fails
+            ValueError: If domain name is invalid
+        """
+        try:
+            request = DomainAvailabilityRequest(
+                domain=domain,
+                check_premium=check_premium,
+            )
+
+            response = await self._client.get(
+                "/domain/check",
+                params={
+                    "domain": request.domain,
+                    "check_premium": str(request.check_premium).lower(),
+                },
+            )
+
+            return DomainAvailabilityResponse(
+                domain=request.domain,
+                available=response.get("available", False),
+                premium=response.get("premium"),
+                price=response.get("price"),
+                currency=response.get("currency"),
+            )
+
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            raise APIError(f"Failed to check domain availability: {str(e)}") from e
+
+    async def list_available_tlds(self) -> TLDListResponse:
+        """List all available TLDs with pricing information.
+
+        Returns:
+            TLDListResponse containing list of available TLDs with metadata
+
+        Raises:
+            APIError: If the API request fails
+        """
+        try:
+            response = await self._client.get("/tlds/available")
+            tlds = [TLDInfo(**tld_data) for tld_data in response.get("tlds", [])]
+
+            return TLDListResponse(
+                tlds=tlds,
+                total=len(tlds),
+            )
+
+        except Exception as e:
+            raise APIError(f"Failed to list available TLDs: {str(e)}") from e

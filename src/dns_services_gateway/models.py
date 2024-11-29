@@ -120,3 +120,64 @@ class NameserverResponse(BaseModel):
     status: str = Field(..., description="Operation status")
 
     model_config = ConfigDict(extra="allow")
+
+
+class DomainAvailabilityRequest(BaseModel):
+    """Domain availability check request model."""
+
+    domain: str = Field(..., description="Domain name to check")
+    check_premium: bool = Field(False, description="Check if domain is premium")
+
+    model_config = ConfigDict(extra="allow")
+
+    @field_validator("domain")
+    def validate_domain(cls, v: str) -> str:
+        """Validate domain name format."""
+        if not v or not isinstance(v, str):
+            raise ValueError("Domain name must be a non-empty string")
+        return v.lower()
+
+
+class DomainAvailabilityResponse(BaseModel):
+    """Domain availability check response model."""
+
+    domain: str = Field(..., description="Domain name checked")
+    available: bool = Field(..., description="Whether the domain is available")
+    premium: Optional[bool] = Field(None, description="Whether the domain is premium")
+    price: Optional[float] = Field(None, description="Domain price if available")
+    currency: Optional[str] = Field(None, description="Currency for the price")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Timestamp of the check",
+    )
+
+    model_config = ConfigDict(extra="allow")
+
+
+class TLDInfo(BaseModel):
+    """TLD information model."""
+
+    name: str = Field(..., description="TLD name (e.g., 'com', 'net', 'org')")
+    available: bool = Field(
+        True, description="Whether the TLD is available for registration"
+    )
+    price: Optional[float] = Field(None, description="Base registration price")
+    currency: Optional[str] = Field(None, description="Currency for the price")
+    restrictions: Optional[str] = Field(
+        None, description="Any registration restrictions"
+    )
+
+    model_config = ConfigDict(extra="allow")
+
+
+class TLDListResponse(BaseModel):
+    """Response model for TLD listing."""
+
+    tlds: List[TLDInfo] = Field(default_factory=list)
+    total: int = Field(..., description="Total number of TLDs")
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Timestamp of the response",
+    )
+
+    model_config = ConfigDict(extra="allow")
