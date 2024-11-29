@@ -74,3 +74,49 @@ class AuthResponse(BaseModel):
         elif isinstance(v, datetime):
             return v.replace(microsecond=0)
         return datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+
+
+class NameserverUpdate(BaseModel):
+    """Nameserver update request model."""
+
+    domain: str = Field(..., description="Domain name or ID")
+    nameservers: List[str] = Field(..., description="List of nameservers")
+    perform_validation: bool = Field(True, description="Validate nameserver format")
+
+    model_config = ConfigDict(extra="allow")
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, v):
+        """Validate domain name or ID."""
+        if not v:
+            raise ValueError("Domain name or ID is required")
+        return v
+
+    @field_validator("nameservers")
+    @classmethod
+    def validate_nameservers(cls, v):
+        """Validate nameserver format."""
+        if not v:
+            raise ValueError("At least one nameserver must be provided")
+        for ns in v:
+            if not isinstance(ns, str) or not ns:
+                raise ValueError("Invalid nameserver format")
+            if not ns.lower().endswith("."):
+                # Append trailing dot if missing
+                ns = f"{ns}."
+        return v
+
+
+class NameserverResponse(BaseModel):
+    """Nameserver operation response model."""
+
+    domain: str = Field(..., description="Domain name")
+    nameservers: List[str] = Field(..., description="List of nameservers")
+    updated: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Last update timestamp",
+    )
+    status: str = Field(..., description="Operation status")
+
+    model_config = ConfigDict(extra="allow")

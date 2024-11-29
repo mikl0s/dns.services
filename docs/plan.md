@@ -139,12 +139,11 @@ Python Version: 3.12.3
 ### Phase 8: Additional Features
 - [x] Implement Basic Authentication support
 - [x] Add endpoint for Get Domain Details by Name
-- [ ] Implement Get and Update Domain Nameservers
-- [ ] Add Register Domain Nameservers feature
-- [ ] Ensure List DNS Records operation is included
+- [x] Implement Get and Update Domain Nameservers
+- [x] Add Register Domain Nameservers feature
+- [x] Ensure List DNS Records operation is included
 - [ ] Implement Domain Availability check
 - [ ] List Available TLDs
-- [ ] Implement Order and Renew Domain operations
 - [ ] Add DNSSEC Management: List, Add, and Remove DNSSEC Keys
 
 ### Phase 9: API Coverage Completion
@@ -159,8 +158,6 @@ Python Version: 3.12.3
 - [ ] Create List DNS Records operation
 - [ ] Implement Domain Availability check
 - [ ] Add List Available TLDs endpoint
-- [ ] Create Order Domain operation
-- [ ] Create Renew Domain operation
 - [ ] Implement DNSSEC Management:
   - [ ] List DNSSEC Keys
   - [ ] Add DNSSEC Keys
@@ -187,7 +184,7 @@ Python Version: 3.12.3
 - Run tests: `venv/bin/pytest tests/`
 - Check coverage: `venv/bin/pytest --cov=dns_services_gateway tests/`
 - Run type checks: `venv/bin/mypy src/`
-- Current test coverage: 92%
+- Current test coverage: 94%
 - Known Issues:
   - False positive coverage warning with coverage.py 6.0.0 (related to Python 3.12.3 module import detection)
 

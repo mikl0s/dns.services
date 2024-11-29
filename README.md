@@ -18,6 +18,7 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
   - Fetch domain details
   - Verify domain configuration
   - Retrieve domain metadata
+  - Nameserver management and registration
 - 📝 Full DNS record CRUD operations
   - Support for A, AAAA, CNAME, MX, and TXT records
   - Batch operations for multiple records
@@ -28,7 +29,7 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
 - 🛡️ Built-in error handling and validation
 - 📘 Comprehensive documentation with docstrings
 - ✨ Full type safety with mypy support
-- 📊 High test coverage with pytest
+- 📊 High test coverage (94%) with pytest
 
 ## Installation
 
@@ -159,7 +160,7 @@ When running tests with pytest-cov (coverage.py 6.0.0), you may see the followin
 /venv/lib/python3.12/site-packages/coverage/inorout.py:508: CoverageWarning: Module src/dns_services_gateway/domain.py was never imported. (module-not-imported)
 ```
 
-This is a known issue with coverage.py when using Python 3.12.3. The warning is a false positive and does not affect the actual test coverage or functionality. The module is properly imported and tested, but coverage.py sometimes fails to detect imports in certain Python module structures.
+This is a known issue with coverage.py when using Python 3.12.3. The warning is a false positive and does not affect the actual test coverage (currently at 94%) or functionality. The module is properly imported and tested, but coverage.py sometimes fails to detect imports in certain Python module structures.
 
 For more information, see:
 - Coverage.py version: 6.0.0

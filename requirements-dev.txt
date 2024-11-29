@@ -10,3 +10,5 @@ pytest
 pytest-cov
 responses
 pytest-mock
+fastapi
+uvicorn

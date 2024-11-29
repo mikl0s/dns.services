@@ -162,6 +162,34 @@ class TokenVerificationError(DNSServicesError):
     """
 
 
+class RateLimitError(DNSServicesError):
+    """Raised when API rate limit is exceeded.
+
+    Args:
+        message: Human-readable error message
+        args: Additional positional arguments for the base Exception class
+        retry_after: Optional number of seconds to wait before retrying
+        details: Optional dictionary containing additional error details
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *args: Any,
+        retry_after: Optional[int] = None,
+        details: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Initialize the rate limit error.
+
+        Args:
+            message: Human-readable error message
+            retry_after: Optional number of seconds to wait before retrying
+            details: Optional dictionary containing additional error details
+        """
+        super().__init__(message, *args, details=details)
+        self.retry_after = retry_after
+
+
 class AuthResponse:
     """Authentication response model.
 

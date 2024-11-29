@@ -5,16 +5,16 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel, Field, SecretStr
 from dotenv import load_dotenv
-from enum import Enum, auto
+from enum import Enum
 
 from .exceptions import ConfigurationError
 
 
-class AuthType(Enum):
+class AuthType(str, Enum):
     """Authentication type for DNS Services."""
 
-    JWT = auto()
-    BASIC = auto()
+    JWT = "JWT"
+    BASIC = "BASIC"
 
 
 class DNSServicesConfig(BaseModel):
