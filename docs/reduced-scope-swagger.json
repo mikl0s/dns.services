@@ -1,0 +1,717 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "Our HTTP [REST API](https://en.wikipedia.org/wiki/Representational_state_transfer) allows you to manage vital details of your account and services in client portal. [JSON](http://www.json.org/) is used for all API returns.",
+    "version": "4.20241004",
+    "title": "DNS.services User API"
+  },
+  "host": "dns.services",
+  "basePath": "/api",
+  "tags": [
+    {
+      "name": "Clientarea"
+    },
+    {
+      "name": "Domains"
+    },
+    {
+      "name": "DNS"
+    }
+  ],
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "login": {
+      "post": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Login",
+        "description": "Generate new authorization token",
+        "operationId": "getToken",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "type": "string",
+            "in": "query",
+            "description": "Your acount email address "
+          },
+          {
+            "name": "password",
+            "type": "string",
+            "in": "query",
+            "description": "Account password "
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "logout": {
+      "post": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Logout",
+        "description": "Invalidate authorization token",
+        "operationId": "dropToken",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "token": {
+      "post": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Refresh Token",
+        "description": "Generate new authorization token using refresh token",
+        "operationId": "refreshToken",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "refresh_token",
+            "type": "string",
+            "in": "query",
+            "description": "Refresh token previously obtained from `POST /login`"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "revoke": {
+      "post": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Revoke Token",
+        "description": "Invalidate authorization and refresh token.\nPass refresh token or call this method with valid access token",
+        "operationId": "revokeToken",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "refresh_token",
+            "type": "string",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "details": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "User Details",
+        "description": "Return registration details for my account",
+        "operationId": "getDetails",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "```json\n\r{\n \"client\": {\n \"id\": \"26\",\n \"email\": \"api@example.com\",\n \"lastlogin\": \"2016-12-30 12:24:28\",\n \"ip\": \"172.100.2.1\",\n \"host\": \"hostname\",\n \"firstname\": \"Joe\",\n \"lastname\": \"Doe\",\n \"companyname\": \"\",\n \"address1\": \"Pretty View Lane\",\n \"address2\": \"3294\",\n \"city\": \"Santa Rosa\",\n \"state\": \"California\",\n \"postcode\": \"95401\",\n \"country\": \"US\",\n \"phonenumber\": \"+1.24123123\"\n }\n}"
+          }
+        }
+      }
+    },
+    "logs": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "User Logs",
+        "description": "Returns logs from history",
+        "operationId": "getLogs",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "affiliates/summary": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get Affiliate summary",
+        "description": "Return affiliate summary",
+        "operationId": "getAffiliateSummary",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "affiliates/campaigns": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get Affiliate campaigns",
+        "description": "Return affiliate campaigns",
+        "operationId": "getAffiliateCampaigns",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "affiliates/commissions": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get Affiliate commissions",
+        "description": "",
+        "operationId": "affiliates_commissions",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "affiliates/payouts": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get Affiliate payouts",
+        "description": "",
+        "operationId": "affiliates_payouts",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "affiliates/vouchers": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get Affiliate vouchers",
+        "description": "",
+        "operationId": "affiliates_vouchers",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "affiliates/commissionplans": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get Affiliate commission plans",
+        "description": "",
+        "operationId": "affiliates_commission_plans",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "contact": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "List contacts",
+        "description": "Return a list of contacts on this account",
+        "operationId": "profiles",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "```json\n\r{\n \"contacts\": [\n {\n \"email\": \"mary@example.com\",\n \"id\": \"49\",\n \"firstname\": \"Mary\",\n \"lastname\": \"Sue\",\n \"companyname\": \"\",\n \"company\": \"0\",\n \"lastlogin\": \"0000-00-00 00:00:00\"\n }\n ]\n}"
+          }
+        }
+      }
+    },
+    "contact/@id": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get contacts details",
+        "description": "Return array with contact details",
+        "operationId": "profile_data",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "type": "integer",
+            "in": "path",
+            "description": "Contact ID",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "```json\n\r{\n \"contact\": {\n \"id\": \"49\",\n \"email\": \"mary@example.com\",\n \"firstname\": \"Mary\",\n \"lastname\": \"Sue\",\n \"companyname\": \"\",\n \"address1\": \"Pretty View Lane\",\n \"address2\": \"3194\",\n \"city\": \"Santa Rosa\",\n \"state\": \"California\",\n \"postcode\": \"95401\",\n \"country\": \"US\",\n \"phonenumber\": \"+1.24123123\",\n \"type\": \"Private\",\n \"privileges\" : {\n \"support\" : [\"tickets\", \"newticket\"]\n }\n }\n}"
+          }
+        }
+      }
+    },
+    "contact/privileges": {
+      "get": {
+        "tags": [
+          "Clientarea"
+        ],
+        "summary": "Get Contact privileges",
+        "description": "Return contact privileges",
+        "operationId": "getContactPrivileges",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "domain/@id": {
+      "get": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "Get Domain Details",
+        "description": "Return domain details",
+        "operationId": "getDomainDetails",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "in": "path",
+            "required": true,
+            "description": "Domain ID or domain name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "domain/@id/reg": {
+      "post": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "Register Domain",
+        "description": "Register a new domain",
+        "operationId": "registerDomain",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "in": "path",
+            "required": true,
+            "description": "Domain name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "domain/@id/dns/@index": {
+      "put": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "Update DNS Record",
+        "description": "Update DNS record",
+        "operationId": "updateDNSRecord",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "in": "path",
+            "required": true,
+            "description": "Domain ID or domain name"
+          },
+          {
+            "name": "index",
+            "type": "integer",
+            "in": "path",
+            "required": true,
+            "description": "Record index"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "domain/@id/reglock": {
+      "get": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "Get Registry Lock Status",
+        "description": "Return registry lock status",
+        "operationId": "getRegistryLockStatus",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "in": "path",
+            "required": true,
+            "description": "Domain ID or domain name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "domain/@id/forwarding": {
+      "put": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "Update Domain Forwarding",
+        "description": "Update domain forwarding settings",
+        "operationId": "updateDomainForwarding",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "in": "path",
+            "required": true,
+            "description": "Domain ID or domain name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "domain/lookup": {
+      "post": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "Domain Lookup",
+        "description": "Check domain availability",
+        "operationId": "checkDomainAvailability",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "domain",
+            "type": "string",
+            "in": "query",
+            "required": true,
+            "description": "Domain name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "domain/order/@id/form": {
+      "get": {
+        "tags": [
+          "Domains"
+        ],
+        "summary": "Get Domain Order Form",
+        "description": "Return domain order form",
+        "operationId": "getDomainOrderForm",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "in": "path",
+            "required": true,
+            "description": "Domain name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "service/@service_id/dns": {
+      "post": {
+        "tags": [
+          "DNS"
+        ],
+        "summary": "Add DNS Zone",
+        "description": "Add new DNS zone",
+        "operationId": "addDNSZone",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "service_id",
+            "type": "integer",
+            "in": "path",
+            "required": true,
+            "description": "Service ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    },
+    "service/@service_id/dns/@zone_id/records": {
+      "post": {
+        "tags": [
+          "DNS"
+        ],
+        "summary": "Add DNS Record",
+        "description": "Add new DNS record",
+        "operationId": "addDNSRecord",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "service_id",
+            "type": "integer",
+            "in": "path",
+            "required": true,
+            "description": "Service ID"
+          },
+          {
+            "name": "zone_id",
+            "type": "integer",
+            "in": "path",
+            "required": true,
+            "description": "Zone ID"
+          },
+          {
+            "name": "type",
+            "type": "string",
+            "in": "query",
+            "required": true,
+            "description": "Record type"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "in": "query",
+            "required": true,
+            "description": "Record name"
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "in": "query",
+            "required": true,
+            "description": "Record content"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`Success`"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "http": {
+      "type": "basic"
+    }
+  },
+  "definitions": {
+    "Clientarea": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Find out more about UserAPI",
+    "url": "https://dns.services/?cmd=userapi"
+  }
+}
