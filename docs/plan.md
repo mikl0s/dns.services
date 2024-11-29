@@ -1,6 +1,6 @@
 # DNS Services Gateway Enhancement Plan
 
-Current Version: v0.2.4
+Current Version: v0.8.1
 Python Version: 3.12.3
 
 ## Core Functionality Enhancements
