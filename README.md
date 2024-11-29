@@ -21,17 +21,17 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
   - Nameserver management and registration
   - Check domain availability
   - List available TLDs with pricing
+  - DNSSEC key management
 - 📝 Full DNS record CRUD operations
   - Support for A, AAAA, CNAME, MX, and TXT records
   - Batch operations for multiple records
   - Record validation and verification
   - TTL management
-- 🎨 Beautiful CLI with colored output and progress indicators
 - ⚡ Efficient bulk operations support
 - 🛡️ Built-in error handling and validation
 - 📘 Comprehensive documentation with docstrings
 - ✨ Full type safety with mypy support
-- 📊 High test coverage (94%) with pytest
+- 📊 High test coverage (95%) with pytest
 
 ## Installation
 
@@ -89,6 +89,7 @@ Or create a `.env` file (see `.env.example`).
 ```python
 from dns_services_gateway import DNSServicesClient, DNSServicesConfig, AuthType
 from dns_services_gateway.records import ARecord, MXRecord, RecordAction
+from dns_services_gateway.dnssec import DNSSECManager
 
 # Create client with JWT authentication (default)
 config = DNSServicesConfig.from_env()
@@ -149,13 +150,34 @@ response = await records_manager.manage_record(
     record=mx_record
 )
 
+# Manage DNSSEC keys
+dnssec_manager = client.dnssec
+
+# List DNSSEC keys
+response = await dnssec_manager.list_keys("example.com")
+for key in response.keys:
+    print(f"Key tag: {key.key_tag}, Algorithm: {key.algorithm}")
+
+# Add a DNSSEC key
+response = await dnssec_manager.add_key(
+    domain="example.com",
+    algorithm=13,  # ECDSAP256SHA256
+    public_key="your_public_key_data",
+    flags=256  # Optional flags
+)
+
+# Remove a DNSSEC key
+response = await dnssec_manager.remove_key(
+    domain="example.com",
+    key_tag=12345
+)
+
 # Verify record propagation
 verified = await records_manager.verify_record(
     domain="example.com",
     record=a_record,
     timeout=60  # Wait up to 60 seconds
 )
-```
 
 ## API Documentation
 
@@ -173,7 +195,7 @@ When running tests with pytest-cov (coverage.py 6.0.0), you may see the followin
 /venv/lib/python3.12/site-packages/coverage/inorout.py:508: CoverageWarning: Module src/dns_services_gateway/domain.py was never imported. (module-not-imported)
 ```
 
-This is a known issue with coverage.py when using Python 3.12.3. The warning is a false positive and does not affect the actual test coverage (currently at 94%) or functionality. The module is properly imported and tested, but coverage.py sometimes fails to detect imports in certain Python module structures.
+This is a known issue with coverage.py when using Python 3.12.3. The warning is a false positive and does not affect the actual test coverage (currently at 95%) or functionality. The module is properly imported and tested, but coverage.py sometimes fails to detect imports in certain Python module structures.
 
 For more information, see:
 - Coverage.py version: 6.0.0

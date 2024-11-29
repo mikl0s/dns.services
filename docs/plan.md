@@ -144,7 +144,7 @@ Python Version: 3.12.3
 - [x] Ensure List DNS Records operation is included
 - [x] Implement Domain Availability check
 - [x] List Available TLDs
-- [ ] Add DNSSEC Management: List, Add, and Remove DNSSEC Keys
+- [x] Add DNSSEC Management: List, Add, and Remove DNSSEC Keys
 
 ### Phase 9: API Coverage Completion
 - [ ] Implement bulk domain listing with metadata endpoint
@@ -156,12 +156,6 @@ Python Version: 3.12.3
 - [ ] Implement Get and Update Domain Nameservers endpoints
 - [ ] Add Register Domain Nameservers endpoint
 - [ ] Create List DNS Records operation
-- [ ] Implement Domain Availability check
-- [ ] Add List Available TLDs endpoint
-- [ ] Implement DNSSEC Management:
-  - [ ] List DNSSEC Keys
-  - [ ] Add DNSSEC Keys
-  - [ ] Remove DNSSEC Keys
 - [ ] Add expiration dates to domain metadata
 - [ ] Implement comprehensive nameserver management
 - [ ] Add domain forwarding management
