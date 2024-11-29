@@ -5,8 +5,16 @@ from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel, Field, SecretStr
 from dotenv import load_dotenv
+from enum import Enum, auto
 
 from .exceptions import ConfigurationError
+
+
+class AuthType(Enum):
+    """Authentication type for DNS Services."""
+
+    JWT = auto()
+    BASIC = auto()
 
 
 class DNSServicesConfig(BaseModel):
@@ -35,6 +43,10 @@ class DNSServicesConfig(BaseModel):
     debug: bool = Field(
         False,
         description="Enable debug logging",
+    )
+    auth_type: AuthType = Field(
+        AuthType.JWT,
+        description="Authentication type",
     )
 
     @classmethod
@@ -76,6 +88,7 @@ class DNSServicesConfig(BaseModel):
                 == "true",
                 timeout=int(os.getenv("DNS_SERVICES_TIMEOUT", "30")),
                 debug=os.getenv("DNS_SERVICES_DEBUG", "false").lower() == "true",
+                auth_type=AuthType(os.getenv("DNS_SERVICES_AUTH_TYPE", "JWT")),
             )
         except ValueError as e:
             raise ConfigurationError(f"Invalid configuration: {str(e)}")
