@@ -7,9 +7,9 @@
 5. Install pre-commit hooks: `venv/bin/pre-commit install`
 6. Run tests with `venv/bin/pytest tests/`
 7. Check type hints with `venv/bin/mypy src/`
-8. Format code with `venv/bin/black .`
-9. Run linting with `venv/bin/flake8`
-10. Generate coverage report: `venv/bin/pytest --cov=src tests/`
+8. Format code with `venv/bin/black src/ tests/`
+9. Run linting with `venv/bin/flake8 src/ tests/`
+10. Generate coverage report: `venv/bin/pytest --cov=dns_services_gateway tests/`
 11. Keep functions focused and single-purpose
 12. Add type hints to all function parameters and return values
 13. Write docstrings for all public functions and classes

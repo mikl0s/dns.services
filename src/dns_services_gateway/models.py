@@ -26,7 +26,7 @@ class OperationResponse(BaseModel):
     operation: str = Field(
         ..., description="Operation type (create/read/update/delete)"
     )
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     data: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 

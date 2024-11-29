@@ -34,12 +34,12 @@ def download(username: str, password: Optional[str], output: Optional[str]) -> N
     config = DNSServicesConfig.from_env()
     token_manager = TokenManager(config=config)
     try:
-        token_manager.download_token(
+        token_path = token_manager.download_token(
             username=username,
             output_path=output,
-            password=password,
+            password=password if password else None,
         )
-        click.echo("Token downloaded successfully")
+        click.echo(f"Token successfully saved to: {token_path}")
     except AuthenticationError as e:
         click.echo(f"Authentication failed: {str(e)}", err=True)
         sys.exit(1)

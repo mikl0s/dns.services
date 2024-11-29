@@ -81,7 +81,9 @@ def test_token_download_success(runner, mock_token_manager, mock_config, mock_en
     assert "Token successfully saved to: /path/to/token" in result.output
 
     mock_token_manager.return_value.download_token.assert_called_once_with(
-        username="testuser", output_path=mock_config.from_env.return_value.token_path
+        username="testuser",
+        output_path=mock_config.from_env.return_value.token_path,
+        password=None,
     )
 
 
@@ -96,7 +98,9 @@ def test_token_download_custom_output(runner, mock_token_manager, mock_env):
     assert "Token successfully saved to: /custom/path/token" in result.output
 
     mock_token_manager.return_value.download_token.assert_called_once_with(
-        username="testuser", output_path="/custom/path/token"
+        username="testuser",
+        output_path="/custom/path/token",
+        password=None,
     )
 
 

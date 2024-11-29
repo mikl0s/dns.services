@@ -1,4 +1,5 @@
 """Setup script for DNS Services Gateway."""
+
 from setuptools import setup, find_packages
 
 setup(

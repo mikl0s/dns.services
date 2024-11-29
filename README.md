@@ -16,6 +16,8 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
 - 🔄 Automatic token refresh handling
 - ⚡ Efficient bulk operations support
 - 🛡️ Built-in error handling and validation
+- 📘 Comprehensive documentation with docstrings
+- ✨ Full type safety with mypy support
 
 ## Installation
 
@@ -98,7 +100,7 @@ For detailed API documentation and examples, please see:
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.12+
 - pip
 - virtualenv (recommended)
 
@@ -120,10 +122,27 @@ pip install -r requirements-dev.txt
 pre-commit install
 ```
 
+### Code Quality
+
+This project maintains high code quality standards:
+
+- Type safety enforced with mypy
+- Code formatting with black
+- Linting with flake8
+- Comprehensive docstrings following Google style
+- Pre-commit hooks for automated checks
+
 ### Running Tests
 
 ```bash
-pytest tests/
+# Run tests with coverage
+pytest tests/ --cov=dns_services_gateway
+
+# Run type checking
+mypy src/
+
+# Run linting
+flake8 src/
 ```
 
 ## Contributing

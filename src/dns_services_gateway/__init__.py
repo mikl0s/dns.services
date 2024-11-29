@@ -11,6 +11,7 @@ __license__ = "MIT"
 
 from dns_services_gateway.client import DNSServicesClient
 from dns_services_gateway.config import DNSServicesConfig
+from dns_services_gateway.domain import DomainOperations
 from dns_services_gateway.exceptions import (
     AuthenticationError,
     TokenError,
@@ -20,6 +21,7 @@ from dns_services_gateway.exceptions import (
 __all__ = [
     "DNSServicesClient",
     "DNSServicesConfig",
+    "DomainOperations",
     "AuthenticationError",
     "TokenError",
     "TokenVerificationError",
