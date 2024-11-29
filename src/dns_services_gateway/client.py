@@ -2,14 +2,15 @@
 
 import json
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+from typing import Optional, Dict, Any
+
 import requests
 from requests.exceptions import RequestException
 
 from .config import DNSServicesConfig
-from .models import AuthResponse, OperationResponse
 from .exceptions import AuthenticationError, APIError
+from .models import AuthResponse
 
 
 class DNSServicesClient:
@@ -75,39 +76,26 @@ class DNSServicesClient:
             )
         )
 
-    def _get_headers(self) -> Dict[str, str]:
-        """Get request headers with authentication.
-
-        Returns:
-            Dict[str, str]: Request headers
-
-        Raises:
-            AuthenticationError: If authentication fails
-        """
-        if not self._token or (
-            self._token_expires
-            and self._token_expires <= datetime.now(timezone.utc)
-        ):
-            self.authenticate()
-
-        return {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-
-    def authenticate(self) -> None:
+    def authenticate(self, force: bool = False) -> None:
         """Authenticate with the API.
 
+        Args:
+            force: If True, force authentication even if a valid token exists
+
         Raises:
             AuthenticationError: If authentication fails
         """
-        # First try to load existing token
+        # Try to load existing token first
         auth = self._load_token()
-        if auth and auth.expires > datetime.now(timezone.utc):
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        if not force and auth and auth.expires > now:
             self._token = auth.token
             self._token_expires = auth.expires
             return
+
+        # Clear existing token before attempting authentication
+        self._token = None
+        self._token_expires = None
 
         try:
             response = self.session.post(
@@ -119,16 +107,45 @@ class DNSServicesClient:
                 timeout=self.config.timeout,
             )
             response.raise_for_status()
-            auth = AuthResponse(**response.json())
+            data = response.json()
+
+            # Parse and normalize the expiry time
+            if "expires" in data:
+                expires = datetime.fromisoformat(data["expires"]).replace(microsecond=0)
+                data["expires"] = expires.isoformat()
+
+            # Create and validate the auth response
+            auth = AuthResponse(**data)
             self._token = auth.token
             self._token_expires = auth.expires
             self._save_token(auth)
 
-        except RequestException as e:
+        except (requests.exceptions.RequestException, ValueError) as e:
+            self._token = None
+            self._token_expires = None
             raise AuthenticationError(
                 "Authentication failed",
                 details={"error": str(e)},
-            )
+            ) from e
+
+    def _get_headers(self) -> Dict[str, str]:
+        """Get request headers with authentication.
+
+        Returns:
+            Dict[str, str]: Request headers
+
+        Raises:
+            AuthenticationError: If authentication fails
+        """
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        if not self._token or (self._token_expires and self._token_expires <= now):
+            self.authenticate()
+
+        return {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
 
     def _request(
         self,
@@ -136,7 +153,7 @@ class DNSServicesClient:
         path: str,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Make an authenticated request to the API.
+        """Make an API request.
 
         Args:
             method: HTTP method
@@ -144,30 +161,58 @@ class DNSServicesClient:
             **kwargs: Additional request arguments
 
         Returns:
-            Dict[str, Any]: API response data
+            Dict[str, Any]: API response
 
         Raises:
-            APIError: If the request fails
+            APIError: If the API request fails
         """
-        kwargs.setdefault("timeout", self.config.timeout)
-        headers = self._get_headers()
-        kwargs.setdefault("headers", {}).update(headers)
+        headers = kwargs.pop("headers", {})
+        headers.update(self._get_headers())
 
         try:
             response = self.session.request(
                 method,
                 f"{self.config.base_url}{path}",
+                headers=headers,
+                timeout=self.config.timeout,
                 **kwargs,
             )
-            response.raise_for_status()
-            return response.json()
+            response.raise_for_status()  # This will raise if status code is not 2xx
+            try:
+                return response.json()
+            except ValueError as e:
+                raise APIError(
+                    f"Failed to parse JSON response: {str(e)}",
+                    status_code=response.status_code,
+                    response_body={"error": str(e)},
+                )
 
         except RequestException as e:
-            raise APIError(
-                f"API request failed: {str(e)}",
-                status_code=getattr(e.response, "status_code", None),
-                response_body=getattr(e.response, "json", lambda: None)(),
-            )
+            if e.response:
+                if e.response.status_code >= 500:
+                    raise APIError(
+                        "Server error",
+                        status_code=e.response.status_code,
+                        response_body={"error": e.response.text},
+                    )
+                elif e.response.status_code >= 400:
+                    raise APIError(
+                        "Client error",
+                        status_code=e.response.status_code,
+                        response_body={"error": e.response.text},
+                    )
+                else:
+                    raise APIError(
+                        "Request failed",
+                        status_code=e.response.status_code,
+                        response_body={"error": e.response.text},
+                    )
+            else:
+                raise APIError(
+                    "API request failed",
+                    status_code=None,
+                    response_body={"error": str(e)},
+                )
 
     def get(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a GET request to the API."""
