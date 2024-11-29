@@ -15,7 +15,11 @@ A Python client library and CLI tool for managing DNS records through the DNS.se
   - Fetch domain details
   - Verify domain configuration
   - Retrieve domain metadata
-- 📝 Full DNS record CRUD operations (Create, Read, Update, Delete)
+- 📝 Full DNS record CRUD operations
+  - Support for A, AAAA, CNAME, MX, and TXT records
+  - Batch operations for multiple records
+  - Record validation and verification
+  - TTL management
 - 🎨 Beautiful CLI with colored output and progress indicators
 - 🔄 Automatic token refresh handling
 - ⚡ Efficient bulk operations support
@@ -78,6 +82,7 @@ Or create a `.env` file (see `.env.example`).
 
 ```python
 from dns_services_gateway import DNSServicesClient, DNSServicesConfig
+from dns_services_gateway.records import ARecord, MXRecord, RecordAction
 
 # Create client
 config = DNSServicesConfig.from_env()
@@ -94,6 +99,37 @@ response = await client.verify_domain("example.com")
 
 # Get domain metadata
 response = await client.get_domain_metadata("example.com")
+
+# Manage DNS records
+records_manager = client.records
+
+# Create an A record
+a_record = ARecord(name="www", value="192.168.1.1", ttl=3600)
+response = await records_manager.manage_record(
+    action=RecordAction.CREATE,
+    domain="example.com",
+    record=a_record
+)
+
+# Create an MX record with priority
+mx_record = MXRecord(
+    name="@",
+    value="mail.example.com",
+    priority=10,
+    ttl=3600
+)
+response = await records_manager.manage_record(
+    action=RecordAction.CREATE,
+    domain="example.com",
+    record=mx_record
+)
+
+# Verify record propagation
+verified = await records_manager.verify_record(
+    domain="example.com",
+    record=a_record,
+    timeout=60  # Wait up to 60 seconds
+)
 ```
 
 ## API Documentation
