@@ -51,29 +51,37 @@ class AuthResponse(BaseModel):
     """Authentication response model."""
 
     token: Optional[str] = None
-    expires: Optional[datetime] = None
+    expires: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc) + timedelta(hours=1)
+    )
     refresh_token: Optional[str] = None
     expiration: Optional[str] = None
 
     model_config = ConfigDict(extra="allow")
 
+    def __init__(self, **data):
+        """Initialize authentication response model with given data.
+
+        Args:
+            **data: Keyword arguments for model initialization.
+        """
+        if "expiration" in data:
+            if isinstance(data["expiration"], datetime):
+                data["expires"] = data["expiration"]
+                data["expiration"] = data["expiration"].isoformat()
+            elif not data.get("expires"):
+                data["expires"] = data["expiration"]
+        super().__init__(**data)
+
     @field_validator("expires", mode="before")
     @classmethod
     def set_expiration(cls, v, info):
-        """Set expiration to 1 hour from now if not provided."""
-        if not v:
-            # Check if expiration is provided in the raw data
-            raw_data = info.data
-            if "expiration" in raw_data:
-                v = raw_data["expiration"]
-                # Store the original expiration string
-                info.data["expiration"] = v
-
+        """Set expiration from string or datetime."""
         if isinstance(v, str):
-            return datetime.fromisoformat(v).replace(microsecond=0)
+            return datetime.fromisoformat(v.replace("Z", "+00:00"))
         elif isinstance(v, datetime):
-            return v.replace(microsecond=0)
-        return datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=1)
+            return v
+        return v
 
 
 class NameserverUpdate(BaseModel):
@@ -81,17 +89,16 @@ class NameserverUpdate(BaseModel):
 
     domain: str = Field(..., description="Domain name or ID")
     nameservers: List[str] = Field(..., description="List of nameservers")
-    perform_validation: bool = Field(True, description="Validate nameserver format")
 
     model_config = ConfigDict(extra="allow")
 
-    @field_validator("domain")
-    @classmethod
-    def validate_domain(cls, v):
-        """Validate domain name or ID."""
-        if not v:
-            raise ValueError("Domain name or ID is required")
-        return v
+    def __init__(self, **data):
+        """Initialize nameserver update model with given data.
+
+        Args:
+            **data: Keyword arguments for model initialization.
+        """
+        super().__init__(**data)
 
     @field_validator("nameservers")
     @classmethod
@@ -100,11 +107,22 @@ class NameserverUpdate(BaseModel):
         if not v:
             raise ValueError("At least one nameserver must be provided")
         for ns in v:
-            if not isinstance(ns, str) or not ns:
-                raise ValueError("Invalid nameserver format")
-            if not ns.lower().endswith("."):
-                # Append trailing dot if missing
-                ns = f"{ns}."
+            # Remove trailing dot for validation
+            ns = ns.rstrip(".")
+            if (
+                not ns
+                or ".." in ns
+                or not all(part.isalnum() or part == "-" for part in ns.split("."))
+            ):
+                raise ValueError(f"Invalid nameserver format: {ns}")
+        return v
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, v):
+        """Validate domain name."""
+        if not v:
+            raise ValueError("Domain name or ID is required")
         return v
 
 

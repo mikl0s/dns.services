@@ -30,6 +30,8 @@ class DateTimeEncoder(json.JSONEncoder):
         """
         if isinstance(obj, datetime):
             return obj.isoformat()
+        if isinstance(obj, (str, int, float, bool, type(None))):
+            return obj
         return super().default(obj)
 
 
@@ -72,12 +74,10 @@ class TokenManager:
     @staticmethod
     def _secure_write_token(token_data: Dict, token_path: Union[str, Path]) -> None:
         """Securely write token to file with proper permissions."""
-        token_path = Path(token_path).expanduser()
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write token with restricted permissions
+        token_path = Path(token_path)
+        token_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         token_path.write_text(json.dumps(token_data, cls=DateTimeEncoder))
-        os.chmod(token_path, 0o600)  # 0600 permissions
+        token_path.chmod(0o600)  # Use Path.chmod instead of os.chmod
 
     def download_token(
         self,
@@ -123,21 +123,17 @@ class TokenManager:
             # Save token to file if path is provided
             token_json = token.model_dump()
             if output_path:
-                path = Path(output_path)
+                path = Path(output_path).expanduser()
                 self._secure_write_token(token_json, str(path))
-                # Set file permissions
-                path.chmod(0o600)
-                return str(path.expanduser())
+                return str(path)
             elif self.config.token_path:
-                path = Path(self.config.token_path)
+                path = Path(self.config.token_path).expanduser()
                 self._secure_write_token(token_json, str(path))
-                # Set file permissions
-                path.chmod(0o600)
-                return str(path.expanduser())
+                return str(path)
             return None
 
         except requests.RequestException as e:
-            raise AuthenticationError(f"Failed to obtain token: {str(e)}") from e
+            raise AuthenticationError(f"Failed to download token: {str(e)}") from e
 
     @staticmethod
     def load_token(token_path: Union[str, Path]) -> Token:

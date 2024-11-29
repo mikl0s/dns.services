@@ -27,7 +27,7 @@ class DNSServicesError(Exception):
         Returns:
             A string representation of the error
         """
-        return f"{self.message}: {self.details}"
+        return self.message
 
 
 class AuthenticationError(DNSServicesError):
@@ -108,7 +108,7 @@ class APIError(DNSServicesError):
         self.response_body = response_body
 
 
-class TokenLoadError(DNSServicesError):
+class TokenLoadError(TokenError):
     """Raised when there is an error loading a token from file.
 
     This can happen if:
@@ -124,7 +124,7 @@ class TokenLoadError(DNSServicesError):
     """
 
 
-class TokenDownloadError(DNSServicesError):
+class TokenDownloadError(TokenError):
     """Raised when there is an error downloading a token from the API.
 
     This can happen if:
@@ -138,7 +138,7 @@ class TokenDownloadError(DNSServicesError):
     """
 
 
-class TokenExpiredError(DNSServicesError):
+class TokenExpiredError(TokenError):
     """Raised when the authentication token has expired.
 
     Args:
@@ -148,7 +148,7 @@ class TokenExpiredError(DNSServicesError):
     """
 
 
-class TokenVerificationError(DNSServicesError):
+class TokenVerificationError(TokenError):
     """Raised when there is an error verifying a token.
 
     This can happen if:

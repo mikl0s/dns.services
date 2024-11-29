@@ -249,6 +249,15 @@ class DNSRecordManager:
                 if result["success"]:
                     responses.append(result["response"])
                 else:
+                    error_response = RecordResponse(
+                        status="error",
+                        operation=operations[i].action,
+                        timestamp=datetime.now(timezone.utc),
+                        data={"error": result["error"]},
+                        metadata={"domain": domain},
+                        verified=False,
+                    )
+                    responses.append(error_response)
                     failed_operations.append(
                         {
                             "operation": operations[i].model_dump(),
@@ -257,6 +266,15 @@ class DNSRecordManager:
                     )
             else:
                 # Handle unexpected errors
+                error_response = RecordResponse(
+                    status="error",
+                    operation=operations[i].action,
+                    timestamp=datetime.now(timezone.utc),
+                    data={"error": str(result)},
+                    metadata={"domain": domain},
+                    verified=False,
+                )
+                responses.append(error_response)
                 failed_operations.append(
                     {"operation": operations[i].model_dump(), "error": str(result)}
                 )

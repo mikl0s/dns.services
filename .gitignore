@@ -26,6 +26,7 @@ coverage.xml
 
 # Type checking
 .mypy_cache/
+.mypy_cache/
 .dmypy.json
 dmypy.json
 .pytype/

@@ -1,5 +1,6 @@
 """Tests for the DNS record management module."""
 
+import asyncio
 import pytest
 from typing import Dict, Any, Optional
 
@@ -191,3 +192,88 @@ async def test_record_verification_timeout(record_manager):
         domain="example.com", record=record, timeout=1
     )
     assert not verified
+
+
+@pytest.mark.asyncio
+async def test_batch_operation_partial_success(record_manager, mocker):
+    """Test batch operation with partial success."""
+    operations = [
+        RecordOperation(
+            action=RecordAction.CREATE,
+            record=ARecord(name="test1", value="192.168.1.1"),
+        ),
+        RecordOperation(
+            action=RecordAction.CREATE,
+            record=ARecord(name="test2", value="192.168.1.2"),
+        ),
+    ]
+
+    # Mock the client to succeed for first operation and fail for second
+    async def mock_request(method, endpoint, data=None, params=None):
+        if data and data.get("name") == "test2":
+            return {"status": "error", "message": "Invalid record"}
+        return {"status": "success", "data": {"record": data}}
+
+    mocker.patch.object(
+        record_manager._client, "make_request", side_effect=mock_request
+    )
+
+    # Use a shorter timeout for testing
+    record_manager._verification_timeout = 1
+    record_manager._verification_interval = 0.1
+
+    response = await record_manager.batch_manage_records(
+        operations=operations,
+        domain="example.com",
+    )
+    assert response.overall_status == "partial"
+    assert len(response.failed_operations) == 1
+    assert len(response.operations) == 2
+
+
+@pytest.mark.asyncio
+async def test_verify_record_dns_error(record_manager, mocker):
+    """Test record verification with DNS lookup error."""
+    record = ARecord(name="error", value="192.168.1.1")
+
+    # Mock the DNS lookup to raise an exception
+    mocker.patch.object(
+        record_manager._client, "make_request", side_effect=Exception("DNS error")
+    )
+
+    verified = await record_manager.verify_record(
+        domain="example.com", record=record, timeout=1
+    )
+    assert not verified
+
+
+@pytest.mark.asyncio
+async def test_verify_record_with_mx_priority(record_manager):
+    """Test MX record verification with priority check."""
+    record = MXRecord(name="@", value="mail.example.com", priority=10)
+    verified = await record_manager.verify_record(domain="example.com", record=record)
+    assert verified
+
+
+@pytest.mark.asyncio
+async def test_batch_operation_timeout(record_manager, mocker):
+    """Test batch operation with timeout."""
+    operations = [
+        RecordOperation(
+            action=RecordAction.CREATE,
+            record=ARecord(name="test1", value="192.168.1.1"),
+        ),
+    ]
+
+    # Mock the operation to timeout
+    async def mock_wait_for(*args, **kwargs):
+        raise asyncio.TimeoutError()
+
+    mocker.patch("asyncio.wait_for", side_effect=mock_wait_for)
+
+    response = await record_manager.batch_manage_records(
+        operations=operations,
+        domain="example.com",
+    )
+    assert response.overall_status == "error"
+    assert "Operation timed out" in response.failed_operations[0]["error"]
