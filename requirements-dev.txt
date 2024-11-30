@@ -4,11 +4,16 @@ flake8
 mypy
 pre-commit
 types-requests
+types-PyYAML
+types-python-dateutil
+types-mock
 
 # Testing
 pytest
 pytest-cov
 responses
+pytest-asyncio
 pytest-mock
 fastapi
 uvicorn
+coverage
