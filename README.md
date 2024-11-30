@@ -4,15 +4,16 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/dns-services-gateway.svg)](https://pypi.org/project/dns-services-gateway/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Development Status](https://img.shields.io/badge/status-alpha-yellow.svg)](https://pypi.org/project/dns-services-gateway/)
 
-> 🚀 **Built with [Windsurf](https://www.codeium.com/windsurf)**
+> **Built with [Windsurf](https://www.codeium.com/windsurf)**
 >
 > This entire production-ready module was created in just a couple of evenings using Windsurf Editor. From initial planning to comprehensive testing, Windsurf's AI-powered capabilities enabled rapid development while maintaining exceptional code quality:
 >
-> - 🎯 97% test coverage
-> - 📘 Full type safety
-> - ⚡ Async-first architecture
-> - 🔧 Production-ready error handling
+> - **97% test coverage**
+> - **Full type safety**
+> - **Async-first architecture**
+> - **Production-ready error handling**
 >
 > It was fun learning Windsurf, and I'm excited to share the results with the community.
 
@@ -26,11 +27,11 @@ The scope of this module is to securely manage domains and DNS entries programat
 
 ## Features
 
-- 🔐 Flexible Authentication
+- **Flexible Authentication**
   - JWT token-based authentication
   - Basic Authentication support
   - Automatic token refresh handling
-- 🌍 Comprehensive domain management
+- **Comprehensive domain management**
   - Bulk domain listing with metadata
   - Pagination and filtering support
   - Domain details with expiration dates
@@ -39,18 +40,18 @@ The scope of this module is to securely manage domains and DNS entries programat
   - Domain availability checking
   - TLD listing with pricing
   - DNSSEC key management
-- 📝 Full DNS record management
+- **Full DNS record management**
   - Support for A, AAAA, CNAME, MX, and TXT records
   - Type-specific validation for all record types
   - Record verification system
   - TTL management
   - Batch operations support
-- ⚡ Performance features
+- **Performance features**
   - Async/await for non-blocking operations
   - Efficient bulk operations
   - Parallel processing for batch operations
   - Comprehensive error handling
-- 🛡️ Quality assurance
+- **Quality assurance**
   - Full type hints with mypy
   - 97% test coverage
   - Black code formatting
@@ -62,12 +63,15 @@ The DNS Services Gateway supports a powerful templating system for managing DNS 
 
 ### Template Features
 
-- 📝 YAML-based configuration
-- 🔄 Variable substitution
-- 🌍 Environment-specific overrides
-- 🔍 Pre-application validation
-- 🔒 Safety features (backup, rollback)
-- 📊 Version tracking
+- **YAML-based configuration**
+- **Variable substitution**
+- **Environment-specific overrides**
+- **Pre-application validation**
+- **Safety features (backup, rollback)**
+- **Version tracking**
+- **Multiple application modes**
+- **Change notifications (Email/Slack)**
+- **Change tracking and history**
 
 ### Template Structure
 
@@ -106,16 +110,67 @@ environments:
     variables:
       ttl: 300
       domain: "staging.example.com"
+
+# Safety settings
+settings:
+  backup:
+    enabled: true
+    retention: 30
+
+  rollback:
+    enabled: true
+    automatic: true
+
+  change_management:
+    require_approval: true
+    notify:
+      email: ["admin@example.com"]
+      slack: ["#dns-changes"]
 ```
 
 ### Using Templates
 
-1. Create a template file (see `template.yaml-example` for a complete example):
+#### CLI Usage
+
+1. Create a new template:
 ```bash
-cp template.yaml-example my-domain-template.yaml
+dns-services template create example-com -d "Example.com DNS template" -a "John Doe"
 ```
 
-2. Apply template to a domain:
+2. Validate a template:
+```bash
+dns-services template validate ~/.dns-services/templates/example-com.yaml
+```
+
+3. Apply template with different modes:
+```bash
+# Force mode (update/create all records)
+dns-services template apply template.yaml -d example.com -e production
+
+# Create only missing records
+dns-services template apply template.yaml -d example.com -e production -m create-missing
+
+# Update only existing records
+dns-services template apply template.yaml -d example.com -e production -m update-existing
+
+# Dry run to see changes
+dns-services template apply template.yaml -d example.com -e production --dry-run
+```
+
+4. View change history:
+```bash
+# List all changes
+dns-services template changes
+
+# Filter by status
+dns-services template changes --status pending
+
+# Show specific change
+dns-services template show-change CHG_20230615_123456
+```
+
+#### Python API Usage
+
 ```python
 from dns_services_gateway import DNSServicesClient
 
@@ -126,7 +181,9 @@ async with DNSServicesClient() as client:
     # Apply template with dry-run
     result = await client.apply_template(
         template,
+        domain="example.com",
         environment="production",
+        mode="force",  # or "create-missing", "update-existing"
         dry_run=True
     )
 
@@ -134,7 +191,9 @@ async with DNSServicesClient() as client:
     if result.is_valid:
         await client.apply_template(
             template,
+            domain="example.com",
             environment="production",
+            mode="force",
             dry_run=False
         )
 ```
@@ -148,14 +207,22 @@ async with DNSServicesClient() as client:
 5. **Test Changes**: Always use dry-run before applying templates
 6. **Back Up Records**: Enable backup feature in template settings
 7. **Environment Separation**: Use environment-specific overrides for different stages
+8. **Change Management**: Enable approval workflow for production changes
+9. **Notifications**: Configure email/Slack notifications for important changes
+10. **Use Appropriate Modes**: Choose the right application mode for your use case
 
 ### Safety Features
 
 Templates include several safety features:
 - Pre-application validation
 - Automatic backup of existing records
-- Rollback capability
-- Change logging
+- Automatic rollback on failure
+- Change approval workflow
+- Email and Slack notifications
+- Detailed change logging
+- Change tracking with unique IDs
+- Multiple application modes
+- Dry-run capability
 - Conflict detection
 - Version compatibility checking
 
