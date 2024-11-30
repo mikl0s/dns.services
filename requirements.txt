@@ -4,3 +4,5 @@ pydantic
 typing-extensions
 click>=8.0.0
 PyJWT>=2.0.0
+PyYAML>=6.0.0
+rich>=13.0.0
