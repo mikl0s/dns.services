@@ -2,7 +2,8 @@
 
 import os
 import pytest
-from dns_services_gateway.config import DNSServicesConfig
+from pydantic import SecretStr
+from dns_services_gateway.config import DNSServicesConfig, AuthType
 from dns_services_gateway.exceptions import ConfigurationError
 from pathlib import Path
 from unittest import mock
@@ -30,7 +31,16 @@ def env_vars():
 
 def test_config_defaults():
     """Test default configuration values."""
-    config = DNSServicesConfig(username="test", password="test")
+    config = DNSServicesConfig(
+        username="test",
+        password=SecretStr("test"),
+        base_url="https://dns.services",
+        token_path=None,
+        verify_ssl=True,
+        timeout=30,
+        debug=False,
+        auth_type=AuthType.JWT,
+    )
     assert config.username == "test"
     assert config.password.get_secret_value() == "test"
     assert config.base_url == "https://dns.services"
@@ -44,12 +54,13 @@ def test_config_custom_values():
     """Test configuration with custom values."""
     config = DNSServicesConfig(
         username="custom_user",
-        password="custom_pass",
+        password=SecretStr("custom_pass"),
         base_url="https://custom.dns.services",
         token_path=Path("~/custom/token"),
         verify_ssl=False,
         timeout=60,
         debug=True,
+        auth_type=AuthType.BASIC,
     )
     assert config.username == "custom_user"
     assert config.password.get_secret_value() == "custom_pass"
@@ -58,6 +69,7 @@ def test_config_custom_values():
     assert config.verify_ssl is False
     assert config.timeout == 60
     assert config.debug is True
+    assert config.auth_type == AuthType.BASIC
 
 
 def test_config_from_env(env_vars):
@@ -70,6 +82,7 @@ def test_config_from_env(env_vars):
     assert config.verify_ssl is False
     assert config.timeout == 60
     assert config.debug is True
+    assert config.auth_type == AuthType.JWT
 
 
 def test_config_from_env_file(tmp_path):
@@ -84,6 +97,7 @@ DNS_SERVICES_TOKEN_PATH=~/env/token
 DNS_SERVICES_VERIFY_SSL=false
 DNS_SERVICES_TIMEOUT=45
 DNS_SERVICES_DEBUG=true
+DNS_SERVICES_AUTH_TYPE=BASIC
 """.strip()
     )
 
@@ -95,6 +109,7 @@ DNS_SERVICES_DEBUG=true
     assert config.verify_ssl is False
     assert config.timeout == 45
     assert config.debug is True
+    assert config.auth_type == AuthType.BASIC
 
 
 def test_config_from_env_missing_required():
@@ -122,12 +137,28 @@ def test_config_from_env_file_not_found():
 def test_get_token_path():
     """Test token path resolution."""
     # Test with no token path
-    config = DNSServicesConfig(username="test", password="test")
+    config = DNSServicesConfig(
+        username="test",
+        password=SecretStr("test"),
+        base_url="https://dns.services",
+        token_path=None,
+        verify_ssl=True,
+        timeout=30,
+        debug=False,
+        auth_type=AuthType.JWT,
+    )
     assert config.get_token_path() is None
 
     # Test with token path
     config = DNSServicesConfig(
-        username="test", password="test", token_path=Path("~/test/token")
+        username="test",
+        password=SecretStr("test"),
+        base_url="https://dns.services",
+        token_path=Path("~/test/token"),
+        verify_ssl=True,
+        timeout=30,
+        debug=False,
+        auth_type=AuthType.JWT,
     )
     token_path = config.get_token_path()
     assert token_path is not None
@@ -138,7 +169,16 @@ def test_get_token_path():
 def test_get_token_path_creates_dirs(tmp_path):
     """Test that get_token_path creates parent directories."""
     token_path = tmp_path / "nested" / "dirs" / "token"
-    config = DNSServicesConfig(username="test", password="test", token_path=token_path)
+    config = DNSServicesConfig(
+        username="test",
+        password=SecretStr("test"),
+        base_url="https://dns.services",
+        token_path=token_path,
+        verify_ssl=True,
+        timeout=30,
+        debug=False,
+        auth_type=AuthType.JWT,
+    )
 
     result = config.get_token_path()
     assert result == token_path.resolve()
@@ -148,15 +188,29 @@ def test_get_token_path_creates_dirs(tmp_path):
 def test_config_timeout_validation():
     """Test timeout validation."""
     # Test valid timeouts
-    config = DNSServicesConfig(username="test", password="test", timeout=1)
-    assert config.timeout == 1
-
-    config = DNSServicesConfig(username="test", password="test", timeout=300)
-    assert config.timeout == 300
+    for timeout in [1, 30, 300]:
+        config = DNSServicesConfig(
+            username="test",
+            password=SecretStr("test"),
+            base_url="https://dns.services",
+            token_path=None,
+            verify_ssl=True,
+            timeout=timeout,
+            debug=False,
+            auth_type=AuthType.JWT,
+        )
+        assert config.timeout == timeout
 
     # Test invalid timeouts
-    with pytest.raises(ValueError):
-        DNSServicesConfig(username="test", password="test", timeout=0)
-
-    with pytest.raises(ValueError):
-        DNSServicesConfig(username="test", password="test", timeout=301)
+    for timeout in [0, -1, 301]:
+        with pytest.raises(ValueError):
+            DNSServicesConfig(
+                username="test",
+                password=SecretStr("test"),
+                base_url="https://dns.services",
+                token_path=None,
+                verify_ssl=True,
+                timeout=timeout,
+                debug=False,
+                auth_type=AuthType.JWT,
+            )

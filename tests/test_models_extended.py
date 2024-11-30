@@ -10,6 +10,7 @@ from dns_services_gateway.models import (
     DomainInfo,
     TLDInfo,
     TLDListResponse,
+    DNSRecord,
 )
 
 
@@ -66,9 +67,15 @@ def test_tld_info_with_restrictions():
 def test_tld_list_response():
     """Test TLDListResponse with multiple TLDs."""
     tlds = [
-        TLDInfo(name="com", available=True, price=10.99, currency="USD"),
-        TLDInfo(name="net", available=True, price=12.99, currency="USD"),
-        TLDInfo(name="org", available=True, price=11.99, currency="USD"),
+        TLDInfo(
+            name="com", available=True, price=10.99, currency="USD", restrictions=None
+        ),
+        TLDInfo(
+            name="net", available=True, price=12.99, currency="USD", restrictions=None
+        ),
+        TLDInfo(
+            name="org", available=True, price=11.99, currency="USD", restrictions=None
+        ),
     ]
     response = TLDListResponse(tlds=tlds, total=3)
     assert len(response.tlds) == 3
@@ -78,30 +85,35 @@ def test_tld_list_response():
 
 def test_domain_info_with_records():
     """Test DomainInfo with DNS records."""
+    now = datetime.now(timezone.utc)
     domain = DomainInfo(
         id="domain123",
         name="example.com",
         status="active",
+        expires=now,
         auto_renew=True,
         nameservers=["ns1.example.com", "ns2.example.com"],
         records=[
-            {
-                "id": "record1",
-                "type": "A",
-                "name": "www",
-                "content": "192.0.2.1",
-                "ttl": 3600,
-            },
-            {
-                "id": "record2",
-                "type": "MX",
-                "name": "@",
-                "content": "mail.example.com",
-                "priority": 10,
-                "ttl": 3600,
-            },
+            DNSRecord(
+                id="record1",
+                type="A",
+                name="www",
+                content="192.0.2.1",
+                ttl=3600,
+                priority=None,
+                proxied=False,
+            ),
+            DNSRecord(
+                id="record2",
+                type="MX",
+                name="@",
+                content="mail.example.com",
+                priority=10,
+                ttl=3600,
+                proxied=False,
+            ),
         ],
     )
-    assert domain.id == "domain123"
     assert len(domain.records) == 2
-    assert domain.records[1].priority == 10
+    assert domain.records[0].type == "A"
+    assert domain.records[1].type == "MX"

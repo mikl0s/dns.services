@@ -1,17 +1,25 @@
 """Command-line interface for DNS Services Gateway."""
 
 import sys
+from datetime import datetime
 import click
 from typing import Optional
 from .auth import TokenManager
 from .exceptions import AuthenticationError, TokenError
 from .config import DNSServicesConfig
+from .templates.cli import template as template_cli
 
 
 @click.group()
-def cli():
+@click.pass_context
+def cli(ctx):
     """DNS Services Gateway CLI."""
+    ctx.ensure_object(dict)
+    ctx.obj["timestamp"] = datetime.utcnow().isoformat()
     pass
+
+
+cli.add_command(template_cli)
 
 
 @cli.group()
