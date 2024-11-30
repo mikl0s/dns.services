@@ -10,7 +10,7 @@ import requests
 from requests.exceptions import RequestException
 
 from .config import DNSServicesConfig, AuthType
-from .exceptions import AuthenticationError, APIError
+from .exceptions import AuthenticationError, APIError, RequestError
 from .models import AuthResponse
 
 
@@ -119,6 +119,8 @@ class DNSServicesClient:
             # Check if token is expired
             if not self._token or not self._token_expires or self._token_expires < now:
                 self.authenticate()
+            if not self._token:
+                raise AuthenticationError("Failed to obtain JWT token")
             headers["Authorization"] = f"Bearer {self._token}"
 
         return headers
@@ -137,12 +139,13 @@ class DNSServicesClient:
             return
 
         # JWT authentication
-        auth = self._load_token()
-        now = datetime.now(timezone.utc).replace(microsecond=0)
-        if not force and auth and auth.expires and auth.expires > now:
-            self._token = auth.token
-            self._token_expires = auth.expires
-            return
+        if not force:
+            auth = self._load_token()
+            now = datetime.now(timezone.utc).replace(microsecond=0)
+            if auth and auth.expires and auth.expires > now:
+                self._token = auth.token
+                self._token_expires = auth.expires
+                return
 
         # Clear existing token before attempting authentication
         self._token = None
@@ -157,108 +160,111 @@ class DNSServicesClient:
                 },
                 timeout=self.config.timeout,
             )
-            response.raise_for_status()
-            data = response.json()
 
-            # Handle both expiration and expires fields
-            if "expiration" in data and "expires" not in data:
-                data["expires"] = data["expiration"]
+            if response.status_code != 200:
+                raise AuthenticationError(f"Authentication failed: {response.text}")
 
-            # Create and validate the auth response
-            auth = AuthResponse(**data)
+            auth_data = response.json()
+            expiration = auth_data.get("expiration") or auth_data.get("expires")
+            if not expiration:
+                raise AuthenticationError("No expiration time in response")
+
+            # Parse expiration time from string to datetime
+            if isinstance(expiration, str):
+                expiration = datetime.fromisoformat(expiration)
+
+            auth = AuthResponse(
+                token=auth_data["token"],
+                expiration=expiration,
+                refresh_token=auth_data.get("refresh_token"),
+            )
             self._token = auth.token
             self._token_expires = auth.expires
             self._save_token(auth)
-
-        except (requests.exceptions.RequestException, ValueError) as e:
-            self._token = None
-            self._token_expires = None
-            raise AuthenticationError(
-                "Authentication failed",
-                details={"error": str(e)},
-            ) from e
+        except (RequestException, KeyError, ValueError) as e:
+            raise AuthenticationError(f"Authentication request failed: {e}")
 
     def _request(
         self,
         method: str,
         path: str,
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
-        """Make an API request.
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ) -> requests.Response:
+        """Make a request to the API.
 
         Args:
             method: HTTP method
             path: API path
-            **kwargs: Additional request arguments
+            headers: Optional headers to include
+            **kwargs: Additional arguments to pass to requests
 
         Returns:
-            Dict[str, Any]: API response
+            Response from the API
 
         Raises:
-            APIError: If the API request fails
+            RequestError: If the request fails
         """
-        headers = kwargs.pop("headers", {})
+        url = f"{self.config.base_url}{path}"
+        headers = headers or {}
         headers.update(self._get_headers())
 
         try:
-            response = self.session.request(
-                method,
-                f"{self.config.base_url}{path}",
+            response = getattr(self.session, method.lower())(
+                url,
                 headers=headers,
                 timeout=self.config.timeout,
                 **kwargs,
             )
-            response.raise_for_status()  # This will raise if status code is not 2xx
-            try:
-                return response.json()
-            except ValueError as e:
-                raise APIError(
-                    f"Failed to parse JSON response: {str(e)}",
-                    status_code=response.status_code,
-                    response_body={"error": str(e)},
-                )
-
+            response.raise_for_status()
+            return response
         except RequestException as e:
-            if e.response:
-                if e.response.status_code >= 500:
-                    raise APIError(
-                        "Server error",
-                        status_code=e.response.status_code,
-                        response_body={"error": e.response.text},
-                    )
-                elif e.response.status_code >= 400:
-                    # Correctly parse the response body as JSON
-                    response_body = json.loads(e.response.text)
-                    raise APIError(
-                        "Client error",
-                        status_code=e.response.status_code,
-                        response_body=response_body,
-                    )
-                else:
-                    raise APIError(
-                        "Request failed",
-                        status_code=e.response.status_code,
-                        response_body={"error": e.response.text},
-                    )
-            else:
-                raise APIError(
-                    "API request failed",
-                    status_code=None,
-                    response_body={"error": str(e)},
-                )
+            raise RequestError(f"Request failed: {e}")
 
     def get(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a GET request to the API."""
-        return self._request("GET", path, **kwargs)
+        response = self._request("GET", path, **kwargs)
+        try:
+            return response.json()
+        except ValueError as e:
+            raise APIError(
+                f"Failed to parse JSON response: {str(e)}",
+                status_code=response.status_code,
+                response_body={"error": str(e)},
+            )
 
     def post(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a POST request to the API."""
-        return self._request("POST", path, **kwargs)
+        response = self._request("POST", path, **kwargs)
+        try:
+            return response.json()
+        except ValueError as e:
+            raise APIError(
+                f"Failed to parse JSON response: {str(e)}",
+                status_code=response.status_code,
+                response_body={"error": str(e)},
+            )
 
     def put(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a PUT request to the API."""
-        return self._request("PUT", path, **kwargs)
+        response = self._request("PUT", path, **kwargs)
+        try:
+            return response.json()
+        except ValueError as e:
+            raise APIError(
+                f"Failed to parse JSON response: {str(e)}",
+                status_code=response.status_code,
+                response_body={"error": str(e)},
+            )
 
     def delete(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a DELETE request to the API."""
-        return self._request("DELETE", path, **kwargs)
+        response = self._request("DELETE", path, **kwargs)
+        try:
+            return response.json()
+        except ValueError as e:
+            raise APIError(
+                f"Failed to parse JSON response: {str(e)}",
+                status_code=response.status_code,
+                response_body={"error": str(e)},
+            )

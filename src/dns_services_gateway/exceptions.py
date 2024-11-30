@@ -240,9 +240,21 @@ class RateLimitError(DNSServicesError):
         Returns:
             A string representation of the error including retry after time if available
         """
-        if self.retry_after:
-            return f"{self.message} (retry after {self.retry_after})"
+        if self.retry_after is not None:
+            return f"{self.message} (retry after {self.retry_after} seconds)"
         return self.message
+
+
+class RequestError(Exception):
+    """Exception raised when a request fails."""
+
+    def __init__(self, message: str) -> None:
+        """Initialize RequestError.
+
+        Args:
+            message: Error message
+        """
+        super().__init__(message)
 
 
 class AuthResponse:

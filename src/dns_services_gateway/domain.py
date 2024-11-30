@@ -491,14 +491,16 @@ class DomainOperations:
             tasks = [execute_operation(op) for op in operations]
             results = await asyncio.gather(*tasks)
             return [
-                result
-                if isinstance(result, OperationResponse)
-                else OperationResponse(
-                    status="error",
-                    operation="batch_dns_operations",
-                    data={"error": str(result)},
-                    timestamp=datetime.now(timezone.utc),
-                    metadata={"failed_operation": operations[i]},
+                (
+                    result
+                    if isinstance(result, OperationResponse)
+                    else OperationResponse(
+                        status="error",
+                        operation="batch_dns_operations",
+                        data={"error": str(result)},
+                        timestamp=datetime.now(timezone.utc),
+                        metadata={"failed_operation": operations[i]},
+                    )
                 )
                 for i, result in enumerate(results)
             ]

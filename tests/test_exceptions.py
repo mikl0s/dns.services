@@ -1,6 +1,5 @@
 """Tests for DNS Services Gateway exceptions."""
 
-from datetime import datetime
 from dns_services_gateway.exceptions import (
     DNSServicesError,
     APIError,
@@ -10,7 +9,7 @@ from dns_services_gateway.exceptions import (
 
 def test_dns_services_error_with_details():
     """Test DNSServicesError with details."""
-    error = DNSServicesError("Test error", {"detail": "More info"})
+    error = DNSServicesError("Test error", details={"detail": "More info"})
     assert str(error) == "Test error: {'detail': 'More info'}"
 
 
@@ -34,9 +33,10 @@ def test_api_error_without_details():
 
 def test_rate_limit_error_with_retry():
     """Test RateLimitError with retry after."""
-    now = datetime.now()
-    error = RateLimitError("Rate limit exceeded", retry_after=now)
-    assert str(error) == f"Rate limit exceeded (retry after {now})"
+    error = RateLimitError(
+        "Rate limit exceeded", retry_after=60
+    )  # Use seconds instead of datetime
+    assert str(error) == "Rate limit exceeded (retry after 60 seconds)"
 
 
 def test_rate_limit_error_without_retry():
