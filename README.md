@@ -19,7 +19,7 @@
 
 ## Description
 
-**No affiliation with DNS.services**
+**No affiliation with DNS.services, made by users of DNS.services**
 
 A Python client library and CLI tool for managing Domains and DNS records through the DNS.services API. This tool provides a simple and intuitive interface for managing domains and DNS records programmatically or via command line, single entry, batch entries or use our template system.
 
