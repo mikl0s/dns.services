@@ -19,7 +19,9 @@
 
 ## Description
 
-A Python client library and CLI tool for managing DNS records through the DNS.services API. This tool provides a simple and intuitive interface for managing domains and DNS records programmatically or via command line.
+**No affiliation with DNS.services**
+
+A Python client library and CLI tool for managing Domains and DNS records through the DNS.services API. This tool provides a simple and intuitive interface for managing domains and DNS records programmatically or via command line, single entry, batch entries or use our template system.
 
 For this module, the DNS.Services API endpoints have been descoped, to only implement domains, DNS and Clientarea endpoints.
 
