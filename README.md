@@ -10,7 +10,7 @@
 >
 > This entire production-ready module was created in just a couple of evenings using Windsurf Editor. From initial planning to comprehensive testing, Windsurf's AI-powered capabilities enabled rapid development while maintaining exceptional code quality:
 >
-> - **97% test coverage**
+> - **>80% test coverage**
 > - **Full type safety**
 > - **Async-first architecture**
 > - **Production-ready error handling**
