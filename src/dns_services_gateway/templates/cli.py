@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import sys
 from typing import Optional
+import re
 
 import click
 from rich.console import Console
@@ -12,10 +13,16 @@ from rich.table import Table
 from .core.loader import TemplateLoader
 from .core.validator import TemplateValidator
 from .environments.config import EnvironmentConfigHandler
-from .environments.manager import EnvironmentManager
-from .safety.backup import BackupManager
+from .environments.manager import EnvironmentManager, ChangeType
+from .safety.backup import BackupManager, BackupSettings
 from .safety.rollback import RollbackManager
-from .safety.change_management import ChangeManager
+from .safety.change_management import ChangeManager, ChangeManagementSettings
+from .variables.manager import VariableManager
+from datetime import datetime
+import yaml
+import asyncio
+from dns_services_gateway.templates.models.base import SingleVariableModel
+import json
 
 console = Console()
 
@@ -32,6 +39,229 @@ def get_template_dir() -> Path:
 def template():
     """Manage DNS templates."""
     pass
+
+
+@template.command()
+def list():
+    """List available templates."""
+    template_dir = get_template_dir()
+    if not template_dir.exists():
+        click.echo("No templates found.")
+        return
+
+    table = Table(title="Available Templates")
+    table.add_column("Name")
+    table.add_column("Description")
+    table.add_column("Last Modified")
+
+    for template_file in template_dir.glob("*.yaml"):
+        try:
+            loader = TemplateLoader(template_file)
+            template_data = loader.load()
+            table.add_row(
+                template_file.stem,
+                template_data.get("metadata", {}).get("description", ""),
+                template_file.stat().st_mtime.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+        except Exception as e:
+            click.echo(f"Error loading {template_file.name}: {str(e)}", err=True)
+
+    console.print(table)
+
+
+@template.command()
+@click.argument("template_file")
+def validate(template_file: str):
+    """Validate a template file."""
+    try:
+        import asyncio
+
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+        validator = TemplateValidator()
+        errors = asyncio.run(
+            validator.validate_template(
+                variables=(
+                    template_data.variables.get_variables()
+                    if hasattr(template_data.variables, "get_variables")
+                    else template_data.variables
+                ),
+                environments=template_data.environments,
+                records=template_data.records,
+            )
+        )
+        if errors:
+            for error in errors:
+                click.echo(f"Error: {error}", err=True)
+            sys.exit(1)
+        click.echo("Template is valid.")
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command()
+@click.argument("template_file")
+def export(template_file: str):
+    """Export a template to standard output."""
+    try:
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+        click.echo(loader.dump(template_data))
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command()
+@click.argument("template_file")
+def backup(template_file: str):
+    """Create a backup of a template."""
+    try:
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+        backup_settings = template_data.settings.get("backup", {})
+        if not backup_settings.get("enabled", False):
+            click.echo("Backup is not enabled in template settings.")
+            sys.exit(1)
+        backup_manager = BackupManager(backup_settings)
+        backup_manager.create_backup(template_data.model_dump())
+        click.echo("Backup created successfully.")
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command()
+@click.argument("template_file")
+def restore(template_file: str):
+    """Restore a template from backup."""
+    try:
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+        backup_settings = template_data.settings.get("backup", {})
+        if not backup_settings.get("enabled", False):
+            click.echo("Backup is not enabled in template settings.")
+            sys.exit(1)
+        backup_manager = BackupManager(backup_settings)
+        restored_data = backup_manager.restore_latest()
+        with open(template_file, "w") as f:
+            yaml.dump(restored_data, f)
+        click.echo("Template restored successfully.")
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command()
+@click.argument("template_file")
+@click.argument("other_file")
+def diff(template_file: str, other_file: str):
+    """Show differences between two templates."""
+    try:
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+        other_loader = TemplateLoader(Path(other_file))
+        other_data = other_loader.load()
+
+        # Get change management settings from template
+        settings = template_data.settings["change_management"]
+        changes_dir = Path(template_file).parent / settings.get(
+            "changes_dir", "changes"
+        )
+
+        change_manager = ChangeManager(changes_dir=str(changes_dir), settings=settings)
+        changes = change_manager.compare_templates(template_data, other_data)
+        if changes:
+            click.echo("Template differences:")
+            for change in changes:
+                click.echo(f"- {change}")
+        else:
+            click.echo("No differences found.")
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command()
+@click.argument("template_file")
+def show(template_file: str):
+    """Display template contents."""
+    try:
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+        click.echo(yaml.dump(template_data.model_dump(), default_flow_style=False))
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command()
+@click.argument("template_file")
+def init(template_file: str):
+    """Initialize a new template."""
+    try:
+        if Path(template_file).exists():
+            click.echo("Template file already exists.")
+            sys.exit(1)
+
+        template_data = {
+            "metadata": {
+                "name": Path(template_file).stem,
+                "description": "New DNS template",
+                "version": "1.0.0",
+                "author": os.getenv("USER", "Unknown"),
+                "created": datetime.utcnow().isoformat(),
+                "updated": datetime.utcnow().isoformat(),
+            },
+            "variables": {
+                "domain": "example.com",
+                "ttl": 3600,
+            },
+            "environments": {
+                "production": {
+                    "variables": {},
+                },
+                "staging": {
+                    "variables": {},
+                },
+            },
+            "records": {
+                "A": [
+                    {
+                        "name": "@",
+                        "type": "A",
+                        "ttl": 3600,
+                        "value": "192.168.1.1",
+                    }
+                ],
+            },
+            "settings": {
+                "backup": {
+                    "enabled": True,
+                    "directory": "backups",
+                    "retention_days": 30,
+                },
+                "rollback": {
+                    "enabled": True,
+                    "max_changes": 10,
+                },
+                "change_management": {
+                    "enabled": True,
+                    "changes_dir": "changes",
+                    "require_approval": True,
+                },
+            },
+            "record_groups": {},
+        }
+
+        Path(template_file).parent.mkdir(parents=True, exist_ok=True)
+        with open(template_file, "w") as f:
+            yaml.dump(template_data, f, default_flow_style=False)
+        click.echo("Template initialized successfully.")
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
 
 
 @template.command()
@@ -107,52 +337,23 @@ settings:
 
 @template.command()
 @click.argument("template_file")
-def validate(template_file: str):
-    """Validate a template file."""
-    try:
-        loader = TemplateLoader(template_file)
-        template_data = loader.load()
-
-        validator = TemplateValidator()
-        errors = validator.validate_template(
-            template_data["variables"],
-            template_data["environments"],
-            template_data["records"],
-        )
-
-        if errors:
-            table = Table(title="Template Validation Errors")
-            table.add_column("Error")
-            for error in errors:
-                table.add_row(error)
-            console.print(table)
-            sys.exit(1)
-        else:
-            click.echo("Template validation successful!")
-
-    except Exception as e:
-        click.echo(f"Validation failed: {str(e)}", err=True)
-        sys.exit(1)
-
-
-@template.command()
-@click.argument("template_file")
-@click.option("--domain", "-d", required=True, help="Domain to apply template to")
-@click.option("--env", "-e", default="production", help="Environment to use")
-@click.option("--dry-run", is_flag=True, help="Perform dry run without making changes")
-@click.option("--force", "-f", is_flag=True, help="Skip approval process")
+@click.argument("domain")
+@click.option("--env", default="default", help="Environment to apply")
+@click.option("--dry-run", is_flag=True, help="Show changes without applying")
+@click.option("--force", is_flag=True, help="Force apply changes")
 @click.option(
     "--mode",
-    "-m",
     type=click.Choice(["force", "create-missing", "update-existing"]),
     default="force",
-    help=(
-        "Application mode: force (update/create all), create-missing (only create new "
-        "records), update-existing (only update existing records)"
-    ),
+    help="Apply mode",
 )
 def apply(
-    template_file: str, domain: str, env: str, dry_run: bool, force: bool, mode: str
+    template_file: str,
+    domain: str,
+    env: str,
+    dry_run: bool,
+    force: bool,
+    mode: str,
 ):
     """Apply a template to a domain.
 
@@ -162,106 +363,261 @@ def apply(
     - update-existing: Only update records that already exist
     """
     try:
-        # Load template
-        loader = TemplateLoader(template_file)
+        # Load and validate template
+        loader = TemplateLoader(Path(template_file))
         template_data = loader.load()
 
-        # Set up environment
-        env_config = EnvironmentConfigHandler()
+        # Initialize environment manager
         env_manager = EnvironmentManager(
-            template_data["variables"], template_data["records"]
+            base_variables=template_data.variables if template_data.variables else {},
+            base_records=template_data.records if template_data.records else {},
         )
 
-        # Get environment configuration
-        environment = loader.get_environment(template_data, env)
-        if not environment:
-            click.echo(f"Environment {env} not found in template", err=True)
+        # Add environment to manager
+        if env not in template_data.environments:
+            click.echo(f"Environment {env} not found in template.")
             sys.exit(1)
 
-        # Apply environment config
-        environment = env_config.apply_environment_config(
-            environment, template_data["variables"]
-        )
-
-        # Set up safety systems
-        backup_manager = BackupManager(
-            str(get_template_dir() / "backups"), template_data["settings"]["backup"]
-        )
-
-        rollback_manager = RollbackManager(str(get_template_dir() / "rollbacks"))
-
-        # Initialize change manager but don't use it yet - will be used in future PR
-        _ = ChangeManager(
-            str(get_template_dir() / "changes"),
-            template_data["settings"]["change_management"],
-        )
-
-        # Create backup
-        if not dry_run:
-            backup_manager.create_backup(domain, [], env)
+        env_model = template_data.environments[env]
+        errors = env_manager.add_environment(env_model)
+        if errors:
+            click.echo(f"Failed to add environment: {', '.join(errors)}")
+            sys.exit(1)
 
         # Calculate changes
-        changes, errors = env_manager.calculate_changes(env)
-        if errors:
-            click.echo("Failed to calculate changes:", err=True)
-            for error in errors:
-                click.echo(f"  {error}", err=True)
+        changes, calc_errors = env_manager.calculate_changes(env, mode)
+        if calc_errors:
+            click.echo(f"Failed to calculate changes: {', '.join(calc_errors)}")
             sys.exit(1)
 
+        # Filter changes based on mode
+        if mode == "create-missing":
+            changes = [c for c in changes if c.type == ChangeType.CREATE]
+        elif mode == "update-existing":
+            changes = [c for c in changes if c.type == ChangeType.UPDATE]
+
         if not changes:
-            click.echo("No changes required")
+            click.echo("No changes to apply.")
             return
-
-        # Show changes
-        table = Table(title="Proposed Changes")
-        table.add_column("Type")
-        table.add_column("Record")
-        table.add_column("Value")
-        table.add_column("TTL")
-
-        for change in changes:
-            table.add_row(
-                change.type.value,
-                change.record.name,
-                change.record.value,
-                str(getattr(change.record, "ttl", "") or ""),
-            )
-
-        console.print(table)
 
         if dry_run:
+            click.echo("Changes to be applied:")
+            for change in changes:
+                click.echo(
+                    f"- {change.type.value}: {change.record.name} ({change.record.type})"
+                )
             return
 
-        # Get approval if required
-        if (
-            not force
-            and template_data["settings"]["change_management"]["require_approval"]
-        ):
-            if not click.confirm("Do you want to apply these changes?"):
-                click.echo("Changes cancelled")
-                return
-
         # Apply changes
+        success, apply_errors = env_manager.apply_changes(env, changes)
+        if not success:
+            click.echo(f"Failed to apply changes: {', '.join(apply_errors)}")
+            sys.exit(1)
+
+        click.echo("Template applied successfully.")
+    except Exception as e:
+        click.echo(f"Failed to apply template: {str(e)}", err=True)
+        sys.exit(1)
+
+
+def _validate_variable_value(key: str, value: str) -> any:
+    """Validate and convert variable value based on its type.
+
+    Args:
+        key: Variable name
+        value: Variable value
+
+    Returns:
+        Validated and converted value
+
+    Raises:
+        ValueError: If validation fails
+    """
+    if key == "ttl":
         try:
-            success, errors = env_manager.apply_changes(env, changes)
-            if not success:
-                click.echo("Failed to apply changes:", err=True)
-                for error in errors:
-                    click.echo(f"  {error}", err=True)
-                if template_data["settings"]["rollback"]["automatic"]:
-                    click.echo("Rolling back changes...")
-                    rollback_manager.rollback_change(changes[0].id)
-                sys.exit(1)
-            click.echo("Changes applied successfully")
+            ttl = int(value)
+            if ttl <= 0:
+                raise ValueError("TTL must be a positive integer")
+            return ttl
+        except ValueError:
+            raise ValueError("TTL must be a valid integer")
+    elif key == "domain":
+        # Use the same validation as in validator.py
+        if not re.match(
+            r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
+            value,
+        ):
+            raise ValueError("Invalid domain name format. Must be a valid DNS name.")
+        return value
+    elif key == "nameservers":
+        try:
+            nameservers = json.loads(value)
+            if not isinstance(nameservers, list):
+                raise ValueError("Nameservers must be a JSON array")
+            for ns in nameservers:
+                if not isinstance(ns, str):
+                    raise ValueError("Each nameserver must be a string")
+                # Validate nameserver hostname format
+                if not re.match(
+                    r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
+                    ns,
+                ):
+                    raise ValueError(f"Invalid nameserver format: {ns}")
+            return nameservers
+        except json.JSONDecodeError:
+            raise ValueError("Nameservers must be a valid JSON array")
+    return value
+
+
+@template.command(name="set-variable")
+@click.argument("template_file")
+@click.argument("key_value")
+@click.option("--description", "-d", help="Description of the variable")
+def set_variable(template_file: str, key_value: str, description: Optional[str] = None):
+    """Set a template variable.
+
+    Args:
+        template_file: Path to the template file
+        key_value: Variable in key=value format
+        description: Optional description of the variable
+    """
+    try:
+        if "=" not in key_value:
+            click.echo("Invalid key-value format. Use: key=value", err=True)
+            sys.exit(1)
+
+        key, value = key_value.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        # Validate key name
+        if not re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", key):
+            click.echo(
+                "Invalid variable name. Use only letters, numbers, and underscores, starting with a letter or underscore",
+                err=True,
+            )
+            sys.exit(1)
+
+        # Load template
+        try:
+            loader = TemplateLoader(Path(template_file))
+            template_data = loader.load()
         except Exception as e:
-            click.echo(f"Failed to apply changes: {str(e)}", err=True)
-            if template_data["settings"]["rollback"]["automatic"]:
-                click.echo("Rolling back changes...")
-                rollback_manager.rollback_change(changes[0].id)
+            click.echo(f"Failed to load template: {str(e)}", err=True)
+            sys.exit(1)
+
+        # Initialize variables if needed
+        if not template_data.variables:
+            template_data.variables = {}
+
+        # Handle built-in variables and validation
+        try:
+            validated_value = _validate_variable_value(key, value)
+            var_manager = VariableManager(template_data.variables)
+            var_manager.set_variable(
+                {
+                    "name": key,
+                    "value": validated_value,
+                    "description": description or "",
+                }
+            )
+            template_data.variables = var_manager.variables
+        except Exception as e:
+            click.echo(f"Failed to set variable: {str(e)}", err=True)
+            sys.exit(1)
+
+        # Save template
+        try:
+            with open(template_file, "w") as f:
+                yaml.dump(template_data.model_dump(), f, default_flow_style=False)
+            click.echo(f"Variable '{key}' set successfully")
+        except Exception as e:
+            click.echo(f"Failed to save template: {str(e)}", err=True)
             sys.exit(1)
 
     except Exception as e:
-        click.echo(f"Failed to apply template: {str(e)}", err=True)
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command(name="get-variable")
+@click.argument("template_file")
+@click.argument("key")
+def get_variable(template_file: str, key: str):
+    """Get a template variable value."""
+    try:
+        # Load template
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+
+        if not template_data.variables:
+            click.echo(f"Variable {key} not found", err=True)
+            sys.exit(1)
+
+        var_manager = VariableManager(template_data.variables)
+        try:
+            variable = var_manager.get_variable(key)
+            click.echo(json.dumps(variable, indent=2))
+        except KeyError:
+            click.echo(f"Variable {key} not found", err=True)
+            sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command(name="remove-variable")
+@click.argument("template_file")
+@click.argument("key")
+def remove_variable(template_file: str, key: str):
+    """Remove a template variable."""
+    try:
+        # Load template
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+
+        if not template_data.variables:
+            click.echo(f"Variable {key} not found", err=True)
+            sys.exit(1)
+
+        var_manager = VariableManager(template_data.variables)
+        try:
+            var_manager.remove_variable(key)
+            template_data.variables = var_manager.variables
+
+            # Save template
+            with open(template_file, "w") as f:
+                yaml.dump(template_data.model_dump(), f, default_flow_style=False)
+            click.echo(f"Variable '{key}' removed successfully")
+        except KeyError:
+            click.echo(f"Variable {key} not found", err=True)
+            sys.exit(1)
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+
+
+@template.command()
+@click.argument("template_file")
+def list_variables(template_file: str):
+    """List template variables."""
+    try:
+        loader = TemplateLoader(Path(template_file))
+        template_data = loader.load()
+        var_manager = VariableManager(template_data.variables)
+        variables = var_manager.get_all_variables()
+        if not variables:
+            click.echo("No variables found.")
+            return
+        table = Table(title="Template Variables")
+        table.add_column("Name")
+        table.add_column("Value")
+        table.add_column("Description")
+        for var in variables:
+            table.add_row(str(var.name), str(var.value), str(var.description))
+        console.print(table)
+    except Exception as e:
+        click.echo(f"Error: {str(e)}", err=True)
         sys.exit(1)
 
 

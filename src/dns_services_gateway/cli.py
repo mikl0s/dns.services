@@ -1,7 +1,7 @@
 """Command-line interface for DNS Services Gateway."""
 
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 import click
 from typing import Optional
 from .auth import TokenManager
@@ -13,10 +13,16 @@ from .templates.cli import template as template_cli
 @click.group()
 @click.pass_context
 def cli(ctx):
-    """DNS Services Gateway CLI."""
+    """DNS Services Gateway CLI.
+
+    This is the main entry point for the DNS Services Gateway command-line interface.
+    It initializes the CLI context and sets up the current timestamp in UTC.
+
+    Args:
+        ctx: Click context object for managing CLI state
+    """
     ctx.ensure_object(dict)
-    ctx.obj["timestamp"] = datetime.utcnow().isoformat()
-    pass
+    ctx.obj["timestamp"] = datetime.now(timezone.utc).isoformat()
 
 
 cli.add_command(template_cli)
@@ -38,7 +44,20 @@ def token():
     default=lambda: DNSServicesConfig.from_env().token_path,
 )
 def download(username: str, password: Optional[str], output: Optional[str]) -> None:
-    """Download and save authentication token."""
+    """Download and save authentication token.
+
+    Authenticates with DNS.services using provided credentials and saves
+    the authentication token to the specified output path.
+
+    Args:
+        username: DNS.services account username
+        password: Account password (will prompt if not provided)
+        output: Path where token should be saved (defaults to config path)
+
+    Example:
+        $ dns-services token download -u myuser@example.com
+        $ dns-services token download -u myuser@example.com -o /custom/path/token
+    """
     config = DNSServicesConfig.from_env()
     token_manager = TokenManager(config=config)
     try:
@@ -67,7 +86,18 @@ def download(username: str, password: Optional[str], output: Optional[str]) -> N
     default=lambda: DNSServicesConfig.from_env().token_path,
 )
 def verify(path: str):
-    """Verify token file exists and is valid."""
+    """Verify token file exists and is valid.
+
+    Checks if the token file exists at the specified path and validates
+    its contents, including expiration status.
+
+    Args:
+        path: Path to the token file to verify
+
+    Example:
+        $ dns-services token verify
+        $ dns-services token verify -p /custom/path/token
+    """
     try:
         token = TokenManager.load_token(path)
         click.echo("Token verification successful!")

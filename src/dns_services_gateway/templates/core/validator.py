@@ -1,231 +1,619 @@
-"""Core validator for DNS template configurations."""
-import re
-from typing import Dict, List, Set, Any
+"""Template validator for DNS configurations."""
 
-from ..models.base import EnvironmentModel, RecordModel
+import re
+import ipaddress
+from typing import Dict, List, Any, Optional, Union, Set
+from pydantic import ValidationInfo
+
+from ..models.base import (
+    EnvironmentModel,
+    MetadataModel,
+    RecordModel,
+    SingleVariableModel,
+    VariableModel,
+    ValidationResult,
+    Template,
+)
+from ...exceptions import ValidationError
 
 
 class TemplateValidator:
-    """Validates DNS template configurations."""
+    """Template validator for DNS configurations."""
 
-    def __init__(self):
-        """Initialize template validator."""
-        self.variables: Set[str] = set()
-        self.environments: Dict[str, EnvironmentModel] = {}
-
-    def validate_template(
-        self,
-        variables: Dict[str, Any],
-        environments: Dict[str, Dict[str, Any]],
-        records: Dict[str, List[Dict[str, Any]]],
-    ) -> List[str]:
-        """Validate template configuration.
+    def __init__(self, template_data: Optional[Dict[str, Any]] = None):
+        """Initialize template validator.
 
         Args:
+            template_data: Template data to validate
+        """
+        self.template_data = template_data or {}
+        self.variables = set()
+        self.environment_names = set()
+
+    async def validate_template(
+        self,
+        metadata: Optional[MetadataModel] = None,
+        variables: Optional[List[SingleVariableModel]] = None,
+        environments: Optional[Dict[str, Any]] = None,
+        records: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    ) -> ValidationResult:
+        """Validate entire template configuration.
+
+        Args:
+            metadata: Template metadata
             variables: Template variables
-            environments: Dictionary of environments
-            records: Dictionary of record lists by type
+            environments: Template environments
+            records: Template DNS records
 
         Returns:
-            List of validation errors
+            ValidationResult: Validation result with any errors
         """
-        errors: List[str] = []
+        result = ValidationResult()
 
-        # Reset state
-        self.variables = set()
-        self.environments = {}
+        try:
+            # Update template data with provided components
+            if metadata:
+                self.template_data["metadata"] = metadata.model_dump()
+            if variables:
+                self.template_data["variables"] = {
+                    var.name: var.value for var in variables
+                }
+            if environments is not None:
+                self.template_data["environments"] = environments
+            if records is not None:
+                self.template_data["records"] = records
 
-        # Validate variables
-        errors.extend(self._validate_variables(variables))
+            # Validate metadata
+            metadata_result = await self.validate_metadata(metadata)
+            if not metadata_result.is_valid:
+                result.merge(metadata_result)
+                return result
 
-        # Validate environments
-        for env_name, env_data in environments.items():
-            env_model = EnvironmentModel(name=env_name, **env_data)
-            errors.extend(self._validate_environment(env_model))
+            # Validate variables and store them for reference validation
+            variables_result = await self.validate_variables(variables)
+            if not variables_result.is_valid:
+                result.merge(variables_result)
+                return result
 
-        # Validate records
-        for record_type, record_list in records.items():
-            record_models = [RecordModel(**r) for r in record_list]
-            errors.extend(self._validate_records(record_type, record_models))
+            # Validate environments
+            environments_result = await self.validate_environments()
+            if not environments_result.is_valid:
+                result.merge(environments_result)
+                return result
 
-        # Validate variable references
-        errors.extend(self._validate_variable_references())
+            # Validate records
+            records_result = await self._validate_records(records)
+            if not records_result.is_valid:
+                result.merge(records_result)
+                return result
 
-        return errors
+            # Validate variable references
+            refs_result = await self.validate_variable_references()
+            result.merge(refs_result)
 
-    def _validate_variables(self, variables: Dict[str, Any]) -> List[str]:
+        except ValidationError as e:
+            result.add_error(str(e))
+        except Exception as e:
+            result.add_error(f"Template validation failed: {str(e)}")
+
+        return result
+
+    async def validate_metadata(
+        self, metadata: Optional[MetadataModel] = None
+    ) -> ValidationResult:
+        """Validate template metadata.
+
+        Args:
+            metadata: Template metadata to validate
+
+        Returns:
+            ValidationResult: Validation result
+        """
+        result = ValidationResult()
+
+        try:
+            if metadata:
+                # Validate version format
+                version = metadata.version
+                if not re.match(r"^\d+\.\d+\.\d+$", version):
+                    result.add_error(
+                        "Version must follow semantic versioning (e.g., 1.0.0)"
+                    )
+                    return result
+                return result
+
+            if "metadata" not in self.template_data:
+                result.add_error("Missing metadata section")
+                return result
+
+            meta_dict = self.template_data["metadata"]
+            if "version" in meta_dict:
+                version = meta_dict["version"]
+                if not re.match(r"^\d+\.\d+\.\d+$", version):
+                    result.add_error(
+                        "Version must follow semantic versioning (e.g., 1.0.0)"
+                    )
+                    return result
+
+            MetadataModel(**meta_dict)
+
+        except Exception as e:
+            result.add_error(f"Invalid metadata: {str(e)}")
+
+        return result
+
+    async def validate_variables(
+        self,
+        variables: Optional[Union[Dict[str, Any], List[SingleVariableModel]]] = None,
+    ) -> ValidationResult:
         """Validate template variables.
 
         Args:
-            variables: Template variables
+            variables: Variables to validate, either as dict or list of models
 
         Returns:
-            List of validation errors
+            ValidationResult: Validation result
         """
-        errors: List[str] = []
+        result = ValidationResult()
 
-        # Store variables for reference validation
+        if variables is None:
+            variables = self.template_data.get("variables", {})
+
+        # Convert list of models to dict if needed
+        if isinstance(variables, list):
+            variables = {var.name: var.value for var in variables}
+            self.template_data["variables"] = variables
+
+        # Update the variables set for reference validation
         self.variables = set(variables.keys())
 
-        # Check for required variables
-        required = {"domain", "ttl", "nameservers"}
-        missing = required - self.variables
-        if missing:
-            errors.append(f"Missing required variables: {', '.join(missing)}")
+        # Validate each variable
+        for name, value in variables.items():
+            if not isinstance(name, str):
+                result.add_error(f"Variable name must be a string: {name}")
+                continue
 
-        return errors
+            if name == "":
+                result.add_error("Variable name cannot be empty")
+                continue
 
-    def _validate_environment(self, environment: EnvironmentModel) -> List[str]:
-        """Validate environment configuration.
+            if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
+                result.add_error(
+                    f"Invalid variable name '{name}'. Must start with a letter and contain only letters, numbers, and underscores"
+                )
 
-        Args:
-            environment: Environment model
+            # Validate TTL values
+            if name == "ttl":
+                try:
+                    ttl = int(value)
+                    if ttl < 0:
+                        result.add_error("TTL must be non-negative")
+                    elif ttl > 2147483647:  # Max 32-bit signed int
+                        result.add_error("TTL value is too large")
+                except (ValueError, TypeError):
+                    result.add_error("TTL must be a valid integer")
 
-        Returns:
-            List of validation errors
-        """
-        errors: List[str] = []
+        return result
 
-        # Check for duplicate environments
-        if environment.name in self.environments:
-            errors.append(f"Duplicate environment: {environment.name}")
-
-        # Store environment for reference validation
-        self.environments[environment.name] = environment
-
-        # Validate environment variables
-        if environment.variables:
-            errors.extend(self._validate_environment_variables(environment))
-
-        return errors
-
-    def _validate_environment_variables(
-        self, environment: EnvironmentModel
-    ) -> List[str]:
-        """Validate environment variables.
+    async def _validate_records(
+        self, records: Optional[Dict[str, List[Dict[str, Any]]]] = None
+    ) -> ValidationResult:
+        """Internal method to validate template records.
 
         Args:
-            environment: Environment model
+            records: Records to validate
 
         Returns:
-            List of validation errors
+            ValidationResult: Validation result
         """
-        errors: List[str] = []
+        result = ValidationResult()
 
-        # Check variable references
-        for var_name, var_value in environment.variables.items():
-            if isinstance(var_value, str):
-                errors.extend(self._validate_variable_value(var_name, var_value))
+        if records is None:
+            records = self.template_data.get("records", {})
 
-        return errors
+        if not isinstance(records, dict):
+            result.add_error("Records must be a dictionary")
+            return result
 
-    def _validate_records(
-        self, record_type: str, records: List[RecordModel]
-    ) -> List[str]:
-        """Validate DNS records.
-
-        Args:
-            record_type: Type of records
-            records: List of records
-
-        Returns:
-            List of validation errors
-        """
-        errors: List[str] = []
+        # First find all A records to check for CNAME conflicts
+        seen_names = set()
+        for record_type, record_list in records.items():
+            if record_type == "A" and isinstance(record_list, list):
+                for record in record_list:
+                    if isinstance(record, (dict, RecordModel)):
+                        name = (
+                            record.name
+                            if isinstance(record, RecordModel)
+                            else record.get("name", "@")
+                        )
+                        seen_names.add(name)
 
         # Validate each record
-        for record in records:
-            errors.extend(self._validate_record(record))
+        for record_type, record_list in records.items():
+            # Validate record type
+            if record_type not in [
+                "A",
+                "AAAA",
+                "CNAME",
+                "MX",
+                "NS",
+                "PTR",
+                "SOA",
+                "SRV",
+                "TXT",
+                "CAA",
+            ]:
+                result.add_error(f"Invalid record type: {record_type}")
+                continue
 
-        return errors
+            if not isinstance(record_list, list):
+                result.add_error(f"Records for type {record_type} must be a list")
+                continue
 
-    def _validate_record(self, record: RecordModel) -> List[str]:
-        """Validate a DNS record.
+            for record in record_list:
+                try:
+                    # Convert RecordModel to dict if needed
+                    if isinstance(record, RecordModel):
+                        record_dict = {
+                            "name": record.name,
+                            "value": record.value,
+                            "ttl": record.ttl,
+                            "type": record.type,
+                        }
+                    elif isinstance(record, dict):
+                        record_dict = dict(record)
+                        record_dict["type"] = record_type
+                    else:
+                        result.add_error("Record must be a dictionary or RecordModel")
+                        continue
+
+                    # Validate hostname
+                    name = record_dict.get("name", "@")
+                    name_result = self.validate_record_name(name)
+                    result.merge(name_result)
+
+                    # Check for CNAME conflicts
+                    if record_type == "CNAME":
+                        if name in seen_names:
+                            result.add_error(
+                                f"CNAME record conflict: {name} already has an A record"
+                            )
+
+                    # Validate record value based on type
+                    value = record_dict.get("value", "")
+                    value_result = await self.validate_record_value(record_type, value)
+                    result.merge(value_result)
+
+                    # Check variable references
+                    for field in ["value", "ttl"]:
+                        if field in record_dict:
+                            value = str(record_dict[field])
+                            refs = self.find_variable_references(value)
+                            for ref in refs:
+                                if ref not in self.variables:
+                                    result.add_error(
+                                        f"Undefined variable reference in record: {ref}"
+                                    )
+
+                except Exception as e:
+                    result.add_error(f"Record validation failed: {str(e)}")
+
+        return result
+
+    async def validate_record_value(
+        self, record_type: str, value: str
+    ) -> ValidationResult:
+        """Validate a record value based on its type.
 
         Args:
-            record: Record model
+            record_type: Type of the record (A, AAAA, CNAME, etc.)
+            value: Value to validate
 
         Returns:
-            List of validation errors
+            ValidationResult: Validation result
         """
-        errors: List[str] = []
+        result = ValidationResult()
 
-        # Validate record name
-        if not self._is_valid_hostname(record.name):
-            errors.append(f"Invalid record name: {record.name}")
+        try:
+            # Skip validation if using variable reference
+            if self.find_variable_references(value):
+                return result
 
-        # Validate record value
-        if isinstance(record.value, str):
-            errors.extend(self._validate_variable_value("value", record.value))
+            if record_type == "A":
+                try:
+                    ip = ipaddress.IPv4Address(value)
+                except ValueError:
+                    result.add_error(f"Invalid IPv4 address: {value}")
 
-        return errors
+            elif record_type == "AAAA":
+                try:
+                    ip = ipaddress.IPv6Address(value)
+                except ValueError:
+                    result.add_error(f"Invalid IPv6 address: {value}")
 
-    def _validate_variable_references(self) -> List[str]:
-        """Validate all variable references.
+            elif record_type == "CNAME":
+                if not self.is_valid_hostname(value) and value != "@":
+                    result.add_error(f"Invalid hostname in CNAME record: {value}")
 
-        Returns:
-            List of validation errors
-        """
-        errors: List[str] = []
+            elif record_type == "MX":
+                if not self.is_valid_hostname(value):
+                    result.add_error(f"Invalid hostname in MX record: {value}")
 
-        # Check environment variable references
-        for env in self.environments.values():
-            if env.variables:
-                for var_name, var_value in env.variables.items():
-                    if isinstance(var_value, str):
-                        errors.extend(
-                            self._validate_variable_value(var_name, var_value)
+            elif record_type == "SRV":
+                parts = value.split(" ")
+                if len(parts) != 4:
+                    result.add_error(
+                        "SRV record must have priority, weight, port, and target"
+                    )
+                else:
+                    try:
+                        priority, weight, port = map(int, parts[:3])
+                        target = parts[3]
+                        if any(x < 0 for x in [priority, weight, port]):
+                            result.add_error(
+                                "SRV priority, weight, and port must be non-negative"
+                            )
+                        if not self.is_valid_hostname(target):
+                            result.add_error(
+                                f"Invalid hostname in SRV target: {target}"
+                            )
+                    except ValueError:
+                        result.add_error(
+                            "SRV priority, weight, and port must be integers"
                         )
 
-        return errors
+            elif record_type == "CAA":
+                parts = value.split(" ", 2)
+                if len(parts) != 3:
+                    result.add_error("CAA record must have flag, tag, and value")
+                else:
+                    flag, tag, caa_value = parts
+                    if not flag.isdigit() or int(flag) not in [0, 128]:
+                        result.add_error("CAA flag must be 0 or 128")
+                    if tag not in ["issue", "issuewild", "iodef"]:
+                        result.add_error("CAA tag must be issue, issuewild, or iodef")
 
-    def _validate_variable_value(self, name: str, value: str) -> List[str]:
-        """Validate a variable value.
+            elif record_type == "NS":
+                if not self.is_valid_hostname(value):
+                    result.add_error(f"Invalid hostname in NS record: {value}")
 
-        Args:
-            name: Variable name
-            value: Variable value
+            elif record_type == "PTR":
+                if not self.is_valid_hostname(value):
+                    result.add_error(f"Invalid hostname in PTR record: {value}")
+
+            elif record_type == "SOA":
+                parts = value.split(" ")
+                if len(parts) != 7:
+                    result.add_error("SOA record must have all required fields")
+                else:
+                    if not self.is_valid_hostname(parts[0]):
+                        result.add_error("Invalid primary nameserver in SOA record")
+                    if not self.is_valid_hostname(parts[1]):
+                        result.add_error("Invalid hostmaster in SOA record")
+                    # Validate serial, refresh, retry, expire, minimum
+                    for i, field in enumerate(
+                        ["serial", "refresh", "retry", "expire", "minimum"]
+                    ):
+                        try:
+                            val = int(parts[i + 2])
+                            if val < 0:
+                                result.add_error(f"SOA {field} must be non-negative")
+                        except ValueError:
+                            result.add_error(f"SOA {field} must be an integer")
+
+        except Exception as e:
+            result.add_error(f"Record value validation failed: {str(e)}")
+
+        return result
+
+    async def validate_environments(self) -> ValidationResult:
+        """Validate template environments.
 
         Returns:
-            List of validation errors
+            ValidationResult: Validation result
         """
-        errors: List[str] = []
+        result = ValidationResult()
+        if "environments" not in self.template_data:
+            return result  # Environments are optional
 
-        # Check for variable references
-        var_refs = self._find_variable_references(value)
-        for var_ref in var_refs:
-            if var_ref not in self.variables:
-                errors.append(f"Invalid variable reference in {name}: {var_ref}")
+        environments = self.template_data["environments"]
+        if not isinstance(environments, dict):
+            result.add_error("Environments must be a dictionary")
+            return result
 
-        return errors
+        seen_envs = set()
+        for env_name, env_data in environments.items():
+            try:
+                # Check for duplicate environment keys
+                if env_name in seen_envs:
+                    result.add_error(f"Found duplicate environment: {env_name}")
+                seen_envs.add(env_name)
 
-    def _find_variable_references(self, value: str) -> Set[str]:
-        """Find variable references in a string.
+                # Create a copy of env_data to avoid modifying the original
+                env_dict = dict(env_data)
+                env_dict["name"] = env_dict.get("name", env_name)
+
+                env_model = EnvironmentModel(**env_dict)
+
+                # Validate environment variables
+                if "variables" in env_dict:
+                    for var_name, var_value in env_dict["variables"].items():
+                        if isinstance(var_value, str):
+                            refs = self.find_variable_references(var_value)
+                            for ref in refs:
+                                # Check if reference is to a global variable
+                                if "." in ref:
+                                    scope, var = ref.split(".", 1)
+                                    if scope == "global":
+                                        if var not in self.template_data.get(
+                                            "variables", {}
+                                        ):
+                                            result.add_error(
+                                                f"Undefined global variable reference in environment {env_name}: {var}"
+                                            )
+                                    else:
+                                        result.add_error(
+                                            f"Invalid variable scope in environment {env_name}: {scope}"
+                                        )
+                                else:
+                                    if ref not in self.variables:
+                                        result.add_error(
+                                            f"Undefined variable reference in environment {env_name}: {ref}"
+                                        )
+
+            except Exception as e:
+                result.add_error(f"Invalid environment '{env_name}': {str(e)}")
+
+        return result
+
+    def is_valid_hostname(self, hostname: str) -> bool:
+        """Check if a hostname is valid.
 
         Args:
-            value: String to check
+            hostname: Hostname to validate
 
         Returns:
-            Set of variable names
+            bool: True if hostname is valid, False otherwise
         """
-        pattern = r"\${([^}]+)}"
-        matches = re.findall(pattern, value)
-        return set(matches)
+        if not hostname:
+            return False
 
-    def _is_valid_hostname(self, hostname: str) -> bool:
-        """Check if hostname is valid.
-
-        Args:
-            hostname: Hostname to check
-
-        Returns:
-            True if valid, False otherwise
-        """
         if hostname == "@":
             return True
 
-        pattern = (
-            r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?"
-            r"(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$"
-        )
-        return bool(re.match(pattern, hostname))
+        if len(hostname) > 255:
+            return False
+
+        if hostname[-1] == ".":
+            hostname = hostname[:-1]
+
+        if hostname[0] == "-" or hostname[-1] == "-":
+            return False
+
+        labels = hostname.split(".")
+        for label in labels:
+            if not label:  # Empty label (consecutive dots)
+                return False
+            if label.startswith("-") or label.endswith("-"):
+                return False
+            if not re.match(r"^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]$", label):
+                return False
+        return True
+
+    def find_variable_references(self, text: str) -> Set[str]:
+        """Find variable references in a string.
+
+        Args:
+            text: Text to search for variable references
+
+        Returns:
+            Set of variable references found
+        """
+        if not text:
+            return set()
+
+        refs = set()
+
+        # Match ${var} pattern
+        pattern1 = r"\${([^}]+)}"
+        matches1 = re.findall(pattern1, text)
+        refs.update(matches1)
+
+        # Match {{variables.var}} pattern
+        pattern2 = r"\{\{variables\.([^}]+)\}\}"
+        matches2 = re.findall(pattern2, text)
+        refs.update(matches2)
+
+        return refs
+
+    def strip_variable_syntax(self, ref: str) -> str:
+        """Strip variable reference syntax.
+
+        Args:
+            ref: Variable reference with syntax (e.g., ${var} or {{variables.var}})
+
+        Returns:
+            Variable name without syntax
+        """
+        if ref.startswith("${") and ref.endswith("}"):
+            return ref[2:-1]
+        if ref.startswith("{{variables.") and ref.endswith("}}"):
+            return ref[12:-2]
+        return ref
+
+    def validate_record_name(self, name: str) -> ValidationResult:
+        """Validate record name.
+
+        Args:
+            name: Record name to validate
+
+        Returns:
+            ValidationResult: Validation result
+        """
+        result = ValidationResult()
+        if not self.is_valid_hostname(name):
+            result.add_error(f"Invalid hostname: {name}")
+        return result
+
+    async def validate_variable_references(
+        self,
+        references: Optional[Union[Set[str], List[str]]] = None,
+        valid_vars: Optional[Union[Set[str], List[str]]] = None,
+    ) -> ValidationResult:
+        """Validate variable references.
+
+        Args:
+            references: Optional set or list of variable references to validate
+            valid_vars: Optional set or list of valid variable names
+
+        Returns:
+            ValidationResult: Validation result
+        """
+        result = ValidationResult()
+
+        # Convert inputs to sets if needed
+        if references is not None:
+            references = {self.strip_variable_syntax(ref) for ref in references}
+        if valid_vars is not None:
+            valid_vars = set(valid_vars)
+
+        # If references and valid_vars are provided directly, validate them
+        if references is not None:
+            if valid_vars is None:
+                valid_vars = self.variables
+
+            for ref in references:
+                if ref not in valid_vars:
+                    result.add_error(f"Undefined variable reference: {ref}")
+            return result
+
+        # Otherwise, validate all references in the template
+        all_refs = set()
+
+        # Collect all variable references from records
+        if "records" in self.template_data:
+            for record_list in self.template_data["records"].values():
+                for record in record_list:
+                    if isinstance(record, dict):
+                        for field in ["value", "ttl"]:
+                            if field in record:
+                                value = str(record[field])
+                                refs = self.find_variable_references(value)
+                                all_refs.update(refs)
+
+        # Collect all variable references from environments
+        if "environments" in self.template_data:
+            for env_data in self.template_data["environments"].values():
+                if isinstance(env_data, dict) and "variables" in env_data:
+                    for var_value in env_data["variables"].values():
+                        if isinstance(var_value, str):
+                            refs = self.find_variable_references(var_value)
+                            all_refs.update(refs)
+
+        # Validate all collected references
+        for ref in all_refs:
+            ref = self.strip_variable_syntax(ref)
+            if ref not in self.variables:
+                result.add_error(f"Undefined variable reference: {ref}")
+
+        return result

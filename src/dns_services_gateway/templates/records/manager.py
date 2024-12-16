@@ -1,4 +1,5 @@
 """DNS record manager for template-based configurations."""
+
 from typing import Dict, List, Optional, Set
 from ..models.base import RecordModel
 from .groups import RecordGroup
@@ -80,6 +81,12 @@ class RecordManager:
         errors = self.validator.validate_record(record)
         if errors:
             return errors
+
+        # Check for duplicate records
+        for group in self.groups.values():
+            for existing in group.records:
+                if existing.name == record.name and existing.type == record.type:
+                    return [f"Record {record.name} ({record.type}) already exists"]
 
         # Get or create group
         if group_name not in self.groups:
@@ -214,3 +221,12 @@ class RecordManager:
         # Convert groups to format expected by validator
         groups_dict = {name: group.records for name, group in self.groups.items()}
         return self.validator.validate_groups(groups_dict)
+
+    def merge_groups(self, group_names: List[str]) -> List[RecordModel]:
+        """Merge multiple record groups."""
+        merged_records = []
+        for group_name in group_names:
+            if group_name not in self.groups:
+                raise KeyError(f"Group '{group_name}' not found")
+            merged_records.extend(self.groups[group_name].records)
+        return merged_records

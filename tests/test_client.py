@@ -5,11 +5,13 @@ from unittest import mock
 
 import pytest
 import json
+import base64
+import requests
 from pydantic import SecretStr
 
 from dns_services_gateway.client import DNSServicesClient
 from dns_services_gateway.config import DNSServicesConfig, AuthType
-from dns_services_gateway.exceptions import AuthenticationError
+from dns_services_gateway.exceptions import AuthenticationError, APIError, RequestError
 from dns_services_gateway.models import AuthResponse
 
 
@@ -40,6 +42,19 @@ def mock_session(client):
     session = mock.Mock()
     session.post = mock.Mock()
     session.verify = True
+
+    # Setup default auth response
+    auth_response = {
+        "token": "test_token",
+        "expiration": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+        "refresh_token": "test_refresh_token",
+    }
+    mock_auth_response = mock.Mock()
+    mock_auth_response.status_code = 200
+    mock_auth_response.json.return_value = auth_response
+    mock_auth_response.text = json.dumps(auth_response)
+    session.post.return_value = mock_auth_response
+
     client.session = session
     return session
 
@@ -414,3 +429,127 @@ def test_http_methods(mock_session, client, method):
         getattr(mock_session, method).assert_called_once_with(
             "https://test.dns.services/test", headers=expected_headers, timeout=30
         )
+
+
+def test_request_json_parse_error(mock_session, client):
+    """Test request with JSON parse error."""
+    # Setup mock response for the actual request
+    mock_response = mock.Mock()
+    mock_response.status_code = 200
+    mock_response.json.side_effect = ValueError("Invalid JSON")
+    mock_response.text = "Not JSON"
+    mock_session.get.return_value = mock_response
+
+    with pytest.raises(APIError) as exc_info:
+        client.get("/test")
+    assert "Failed to parse JSON response" in str(exc_info.value)
+    assert exc_info.value.status_code == 200
+    assert exc_info.value.response_body == {"error": "Invalid JSON"}
+
+
+def test_request_timeout(mock_session, client):
+    """Test request timeout handling."""
+    mock_session.get.side_effect = requests.exceptions.Timeout("Request timed out")
+
+    with pytest.raises(RequestError) as exc_info:
+        client.get("/test")
+    assert "Request timed out" in str(exc_info.value)
+
+
+def test_request_connection_error(mock_session, client):
+    """Test connection error handling."""
+    mock_session.get.side_effect = requests.exceptions.ConnectionError(
+        "Connection failed"
+    )
+
+    with pytest.raises(RequestError) as exc_info:
+        client.get("/test")
+    assert "Connection failed" in str(exc_info.value)
+
+
+def test_request_http_error(mock_session, client):
+    """Test HTTP error handling."""
+    mock_response = mock.Mock()
+    mock_response.status_code = 404
+    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+        "404 Not Found"
+    )
+    mock_session.get.return_value = mock_response
+
+    with pytest.raises(RequestError) as exc_info:
+        client.get("/test")
+    assert "404 Not Found" in str(exc_info.value)
+
+
+def test_all_http_methods_json_error(mock_session, client):
+    """Test JSON parsing errors for all HTTP methods."""
+    mock_response = mock.Mock()
+    mock_response.status_code = 200
+    mock_response.json.side_effect = ValueError("Invalid JSON")
+    mock_response.text = "Not JSON"
+
+    for method in ["get", "post", "put", "delete"]:
+        mock_method = getattr(mock_session, method)
+        mock_method.return_value = mock_response
+
+        with pytest.raises(APIError) as exc_info:
+            method_func = getattr(client, method)
+            method_func("/test")
+        assert "Failed to parse JSON response" in str(exc_info.value)
+        assert exc_info.value.status_code == 200
+
+
+def test_basic_auth_header(client):
+    """Test basic auth header generation."""
+    client.config.auth_type = AuthType.BASIC
+    headers = client._get_headers()
+    assert headers["Authorization"].startswith("Basic ")
+    decoded = base64.b64decode(headers["Authorization"].split()[1]).decode()
+    assert (
+        decoded
+        == f"{client.config.username}:{client.config.password.get_secret_value()}"
+    )
+
+
+def test_jwt_auth_expired_token_refresh(client, mock_session, auth_response):
+    """Test JWT auth with expired token and refresh."""
+    # Set expired token
+    client._token = "expired_token"
+    client._token_expires = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    # Mock successful refresh
+    mock_response = mock.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = auth_response
+    mock_session.post.return_value = mock_response
+
+    headers = client._get_headers()
+    assert headers["Authorization"] == f"Bearer {auth_response['token']}"
+    mock_session.post.assert_called_once()
+
+
+def test_auth_invalid_expiration(client, mock_session):
+    """Test authentication with invalid expiration format."""
+    mock_response = mock.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "token": "test_token",
+        "expiration": "invalid_date",
+    }
+    mock_session.post.return_value = mock_response
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        client.authenticate(force=True)
+    assert "Authentication request failed" in str(exc_info.value)
+
+
+def test_auth_missing_token(client, mock_session):
+    """Test authentication with missing token in response."""
+    mock_response = mock.Mock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"expiration": "2024-12-31T00:00:00Z"}
+    mock_session.post.return_value = mock_response
+
+    with pytest.raises(AuthenticationError) as exc_info:
+        client.authenticate(force=True)
+    assert "Authentication request failed" in str(exc_info.value)

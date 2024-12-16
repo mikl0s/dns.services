@@ -8,6 +8,7 @@ from .models import NameserverUpdate, NameserverResponse, OperationResponse
 from .exceptions import (
     DNSServicesError,
     ValidationError,
+    APIError,
 )
 
 
@@ -101,31 +102,38 @@ class NameserverManager:
             raise DNSServicesError(f"Failed to update nameservers: {str(e)}") from e
 
     async def verify_nameservers(
-        self, domain: str, nameservers: Optional[List[str]] = None
-    ) -> bool:
-        """Verify nameserver configuration for a domain.
+        self, domain: str, nameservers: List[str]
+    ) -> OperationResponse:
+        """Verify nameservers for a domain.
 
         Args:
-            domain: Domain name or ID
-            nameservers: Optional list of nameservers to verify against.
-                        If not provided, verifies current nameservers.
+            domain: Domain name
+            nameservers: List of nameserver hostnames to verify
 
         Returns:
-            bool: True if nameservers are correctly configured
+            OperationResponse containing verification results
 
         Raises:
-            ValidationError: If domain format is invalid
-            DNSServicesError: If API request fails
+            APIError: If the API request fails
         """
         try:
-            current = await self.get_nameservers(domain)
-            if nameservers is None:
-                nameservers = current.nameservers
+            # Since there's no direct verification endpoint, we'll check if we can get the domain
+            # and if its nameservers match what we expect
+            response = await self._client.get(f"/domain/{domain}")
+            current_ns = response.get("nameservers", [])
 
-            response = await self._client.post(
-                f"domain/{domain}/nameservers/verify",
-                json={"nameservers": nameservers},
+            verification_results = {
+                "verified": sorted(current_ns) == sorted(nameservers),
+                "current_nameservers": current_ns,
+                "expected_nameservers": nameservers,
+            }
+
+            return OperationResponse(
+                status="success",
+                operation="verify_nameservers",
+                data=verification_results,
+                metadata={"domain": domain},
             )
-            return response.get("verified", False)
+
         except Exception as e:
-            raise DNSServicesError(f"Failed to verify nameservers: {str(e)}") from e
+            raise APIError(f"Failed to verify nameservers: {str(e)}")

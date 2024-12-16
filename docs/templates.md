@@ -25,52 +25,38 @@ metadata:
 ### Variables Section
 ```yaml
 variables:
-  domain: "example.com"
-  ttl: 3600
-  ip_web: "203.0.113.10"
-  ip_mail: "203.0.113.20"
-  hostmaster: "hostmaster@example.com"
+  domain: "example.com"  # Base domain for records
+  ttl: 3600             # Default TTL for records
+  custom_vars:          # Custom variables
+    ip_web: 
+      value: "203.0.113.10"
+      description: "Web server IP"
+    ip_mail:
+      value: "203.0.113.20"
+      description: "Mail server IP"
 ```
 
 ### Records Section
 ```yaml
 records:
-  # Web hosting records
-  web:
-    - type: A
-      name: "@"
+  A:
+    - name: "@"
       value: ${ip_web}
       ttl: ${ttl}
       description: "Main website"
-
-    - type: CNAME
-      name: "www"
+  
+  CNAME:
+    - name: "www"
       value: "@"
       ttl: ${ttl}
       description: "WWW alias"
-
-  # Mail server records
-  mail:
-    - type: MX
-      name: "@"
+  
+  MX:
+    - name: "@"
       value: "mail.${domain}"
       priority: 10
       ttl: ${ttl}
       description: "Primary mail server"
-
-    - type: TXT
-      name: "@"
-      value: "v=spf1 mx -all"
-      ttl: ${ttl}
-      description: "SPF record"
-
-  # Security records
-  security:
-    - type: CAA
-      name: "@"
-      value: "0 issue \"letsencrypt.org\""
-      ttl: ${ttl}
-      description: "CAA record for Let's Encrypt"
 ```
 
 ### Environments Section
@@ -80,136 +66,88 @@ environments:
     variables:
       ttl: 3600
     records:
-      security:
-        - type: TXT
-          name: "_dmarc"
-          value: "v=DMARC1; p=reject; rua=mailto:dmarc@${domain}"
+      TXT:
+        - name: "_dmarc"
+          value: "v=DMARC1; p=reject;"
           ttl: ${ttl}
 
   staging:
     variables:
       ttl: 300
-      domain: "staging.example.com"
     records:
-      security:
-        - type: TXT
-          name: "_dmarc"
-          value: "v=DMARC1; p=none; rua=mailto:dmarc-staging@${domain}"
+      TXT:
+        - name: "_dmarc"
+          value: "v=DMARC1; p=none;"
           ttl: ${ttl}
 ```
 
-## Template Features
+## CLI Commands
+
+### Template Management
+- `template create NAME [--description DESC] [--author AUTHOR]` - Create a new template
+- `template init TEMPLATE_FILE` - Initialize template with basic structure
+- `template list` - List available templates
+- `template show TEMPLATE_FILE` - Display template contents
+- `template validate TEMPLATE_FILE` - Validate template structure and records
+- `template export TEMPLATE_FILE` - Export template to stdout
+- `template diff TEMPLATE_FILE OTHER_FILE` - Show differences between templates
+
+### Variable Management
+- `template set-variable TEMPLATE_FILE KEY=VALUE [--description DESC]` - Set template variable
+- `template get-variable TEMPLATE_FILE KEY` - Get variable value
+- `template remove-variable TEMPLATE_FILE KEY` - Remove variable
+- `template list-variables TEMPLATE_FILE` - List all variables
+
+### Template Application
+- `template apply TEMPLATE_FILE --domain DOMAIN --env ENV [--dry-run] [--force] [--mode MODE]`
+  - Modes:
+    - `force` - Create new records and update existing ones (default)
+    - `create-missing` - Only create records that don't exist
+    - `update-existing` - Only update records that already exist
+
+### Backup and Recovery
+- `template backup TEMPLATE_FILE` - Create template backup
+- `template restore TEMPLATE_FILE` - Restore from backup
+
+## Features
 
 ### Variable Substitution
-- Use `${variable_name}` syntax to reference variables
-- Variables can be used in any string field
-- Environment-specific variables override global variables
-- Supports nested variable references
+- Use `${variable_name}` syntax in any string field
+- Environment variables override global variables
+- Built-in variables: `domain`, `ttl`
+- Custom variables with descriptions
 
-### Record Groups
-- Group records by purpose (web, mail, security, etc.)
-- Improves template organization and maintainability
-- Makes it easier to enable/disable specific functionality
+### Record Validation
+- Type-specific validation (A, AAAA, MX, TXT, SRV, etc.)
+- Value format checking
+- Required field validation
+- TTL range validation
 
-### Environment Overrides
-- Define different configurations for production, staging, development
-- Override variables per environment
-- Add or modify records per environment
-- Inherit from base configuration
+### Environment Support
+- Environment-specific variables
+- Environment-specific records
+- Inheritance from base configuration
+- Multiple environment support (production, staging, etc.)
 
 ### Safety Features
-
-#### Validation
-- Schema validation of template structure
-- Record type-specific validation
-- Variable reference validation
-- Circular dependency detection
-
-#### Backup and Rollback
-```yaml
-settings:
-  backup:
-    enabled: true
-    retention: 30  # days
-  rollback:
-    enabled: true
-    automatic: true  # auto-rollback on error
-```
-
-#### Change Management
-```yaml
-settings:
-  changes:
-    require_approval: true
-    notify:
-      - email: "dns-admin@example.com"
-      - slack: "#dns-changes"
-```
+- Backup and restore functionality
+- Change tracking
+- Dry-run mode
+- Validation before apply
+- Rollback capability
 
 ## Best Practices
 
-### 1. Version Control
-- Always include version information in metadata
-- Use semantic versioning
-- Document changes in template
-
-### 2. Documentation
-- Add descriptions to records
-- Document template purpose
-- Include usage examples
-- Document dependencies
-
-### 3. Variables
-- Use descriptive variable names
-- Group related variables
-- Set sensible defaults
-- Document expected values
-
-### 4. Testing
-- Test templates in staging first
-- Use dry-run feature
-- Validate DNS propagation
-- Monitor for errors
-
-### 5. Security
-- Use DNSSEC where possible
-- Implement SPF, DKIM, DMARC
-- Regular security reviews
-- Limit access to templates
-
-## CLI Usage
-
-### Creating Templates
-```bash
-dns-services template create --name web-mail-template
-```
-
-### Validating Templates
-```bash
-dns-services template validate my-template.yaml
-```
-
-### Applying Templates
-```bash
-dns-services template apply my-template.yaml --domain example.com --env production
-```
-
-### Dry Run
-```bash
-dns-services template apply my-template.yaml --domain example.com --env production --dry-run
-```
-
-### Backup and Restore
-```bash
-# Create backup
-dns-services template backup example.com
-
-# List backups
-dns-services template backups list example.com
-
-# Restore from backup
-dns-services template restore example.com --backup 2024-03-21-143022
-```
+1. Use descriptive variable names
+2. Add descriptions to records
+3. Group related records
+4. Test in staging environment first
+5. Use dry-run before applying changes
+6. Keep templates version controlled
+7. Document template purpose and usage
+8. Validate templates before deployment
+9. Use environment-specific configurations
+10. Implement proper security records
 
 ## API Usage
 
@@ -295,9 +233,8 @@ inherit:
 ### Conditional Records
 ```yaml
 records:
-  web:
-    - type: A
-      name: "@"
+  A:
+    - name: "@"
       value: ${ip_web}
       condition: ${environment} == "production"
 ```
@@ -307,21 +244,19 @@ records:
 validation:
   rules:
     - name: "require-www"
-      condition: "any(r.name == 'www' for r in records.web)"
+      condition: "any(r.name == 'www' for r in records.A)"
       message: "Missing www CNAME record"
 ```
 
 ### Record Dependencies
 ```yaml
 records:
-  web:
-    - type: A
-      name: "@"
+  A:
+    - name: "@"
       value: ${ip_web}
       id: main-a
 
-    - type: CNAME
-      name: "www"
+    - name: "www"
       value: "@"
       depends_on: main-a
 ```

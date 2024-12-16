@@ -3,6 +3,8 @@
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field, field_validator, ConfigDict
+from dataclasses import dataclass, field
+from datetime import datetime
 
 
 class DNSRecord(BaseModel):
@@ -19,30 +21,94 @@ class DNSRecord(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
-class OperationResponse(BaseModel):
-    """API operation response model."""
+@dataclass
+class DomainInfo:
+    """Domain information."""
 
-    status: str = Field(..., description="Operation status (success/error)")
-    operation: str = Field(
-        ..., description="Operation type (create/read/update/delete)"
+    id: str
+    name: str
+    status: str
+    expires: Optional[datetime] = None
+    auto_renew: bool = False
+    nameservers: List[str] = field(default_factory=list)
+    records: List[Dict[str, Any]] = field(default_factory=list)
+    expires_at: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    registrar: Optional[str] = None
+
+    @property
+    def registrar_name(self) -> Optional[str]:
+        """Get registrar name from metadata."""
+        return self.metadata.get("registrar")
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DomainInfo":
+        """Create instance from dictionary."""
+        metadata = data.get("metadata", {})
+        expires = None
+        if expires_at := data.get("expires_at"):
+            try:
+                expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                pass
+
+        return cls(
+            id=data["id"],
+            name=data["name"],
+            status=data["status"],
+            expires=expires,
+            auto_renew=data.get("auto_renew", False),
+            nameservers=data.get("nameservers", []),
+            records=data.get("records", []),
+            expires_at=data.get("expires_at"),
+            metadata=metadata,
+            registrar=data.get("registrar") or metadata.get("registrar"),
+        )
+
+
+class DomainAvailabilityResponse(BaseModel):
+    """Response for domain availability check."""
+
+    domain: Optional[str] = Field(None, description="Domain name checked")
+    available: bool = Field(..., description="Whether the domain is available")
+    price: Optional[float] = Field(None, description="Registration price if available")
+    currency: Optional[str] = Field(None, description="Currency for the price")
+    premium: Optional[bool] = Field(
+        None, description="Whether this is a premium domain"
     )
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    data: Dict[str, Any] = Field(default_factory=dict)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Response timestamp",
+    )
 
     model_config = ConfigDict(extra="allow")
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DomainAvailabilityResponse":
+        """Create instance from dictionary."""
+        return cls(
+            domain=data.get("domain"),
+            available=data["available"],
+            price=data.get("price"),
+            currency=data.get("currency"),
+            premium=data.get("premium"),
+            timestamp=data.get("timestamp"),
+        )
 
-class DomainInfo(BaseModel):
-    """Domain information model."""
 
-    id: str = Field(..., description="Domain ID")
-    name: str = Field(..., description="Domain name")
-    status: str = Field(..., description="Domain status")
-    expires: Optional[datetime] = Field(None, description="Expiration date")
-    auto_renew: bool = Field(False, description="Auto-renewal status")
-    nameservers: List[str] = Field(default_factory=list)
-    records: List[DNSRecord] = Field(default_factory=list)
+class OperationResponse(BaseModel):
+    """Response for domain operations."""
+
+    status: str = Field(..., description="Operation status")
+    operation: str = Field(..., description="Operation type")
+    data: Dict[str, Any] = Field(default_factory=dict, description="Operation data")
+    timestamp: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Operation timestamp",
+    )
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional metadata"
+    )
 
     model_config = ConfigDict(extra="allow")
 
@@ -154,22 +220,6 @@ class DomainAvailabilityRequest(BaseModel):
         if not v or not isinstance(v, str):
             raise ValueError("Domain name must be a non-empty string")
         return v.lower()
-
-
-class DomainAvailabilityResponse(BaseModel):
-    """Domain availability check response model."""
-
-    domain: str = Field(..., description="Domain name checked")
-    available: bool = Field(..., description="Whether the domain is available")
-    premium: Optional[bool] = Field(None, description="Whether the domain is premium")
-    price: Optional[float] = Field(None, description="Domain price if available")
-    currency: Optional[str] = Field(None, description="Currency for the price")
-    timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
-        description="Timestamp of the check",
-    )
-
-    model_config = ConfigDict(extra="allow")
 
 
 class TLDInfo(BaseModel):

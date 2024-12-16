@@ -1,6 +1,8 @@
 """Record groups management for DNS template configurations."""
+
 from typing import Dict, List, Optional, Literal
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
+import re
 
 from ..models.base import RecordModel
 
@@ -8,10 +10,11 @@ from ..models.base import RecordModel
 class ARecord(RecordModel):
     """A record type."""
 
-    type: Literal["A"] = Field(default="A")
+    type: Literal["A"] = Field(default="A", description="Record type")
 
-    @validator("value")
-    def validate_ipv4(cls, v: str) -> str:
+    @field_validator("value")
+    @classmethod
+    def validate_ipv4(cls, v: str, info: ValidationInfo) -> str:
         """Validate IPv4 address."""
         import ipaddress
 
@@ -25,10 +28,11 @@ class ARecord(RecordModel):
 class AAAARecord(RecordModel):
     """AAAA record type."""
 
-    type: Literal["AAAA"] = Field(default="AAAA")
+    type: Literal["AAAA"] = Field(default="AAAA", description="Record type")
 
-    @validator("value")
-    def validate_ipv6(cls, v: str) -> str:
+    @field_validator("value")
+    @classmethod
+    def validate_ipv6(cls, v: str, info: ValidationInfo) -> str:
         """Validate IPv6 address."""
         import ipaddress
 
@@ -42,57 +46,98 @@ class AAAARecord(RecordModel):
 class CNAMERecord(RecordModel):
     """CNAME record type."""
 
-    type: Literal["CNAME"] = Field(default="CNAME")
+    type: Literal["CNAME"] = Field(default="CNAME", description="Record type")
 
-    @validator("value")
-    def validate_hostname(cls, v: str) -> str:
+    @field_validator("value")
+    @classmethod
+    def validate_hostname(cls, v: str, info: ValidationInfo) -> str:
         """Validate hostname."""
-        if v != "@" and not v.endswith("."):
-            if not all(part.isalnum() or part == "-" for part in v.split(".")):
-                raise ValueError(f"Invalid hostname: {v}")
+        if not v or not isinstance(v, str):
+            raise ValueError("Hostname must be a non-empty string")
+        if v.endswith("."):
+            v = v[:-1]
+        if len(v) > 253:
+            raise ValueError("Domain name exceeds maximum length")
         return v
 
 
 class MXRecord(RecordModel):
     """MX record type."""
 
-    type: Literal["MX"] = Field(default="MX")
-    priority: int = Field(default=..., ge=0, le=65535)
+    type: Literal["MX"] = Field(default="MX", description="Record type")
+    priority: int = Field(
+        ...,  # Required field
+        description="Priority for MX records (0-65535)",
+        ge=0,  # Minimum value
+        le=65535,  # Maximum value
+    )
 
-    @validator("value")
-    def validate_hostname(cls, v: str) -> str:
-        """Validate hostname."""
-        if v != "@" and not v.endswith("."):
-            if not all(part.isalnum() or part == "-" for part in v.split(".")):
-                raise ValueError(f"Invalid hostname: {v}")
+    @field_validator("priority", mode="before")
+    @classmethod
+    def validate_priority(cls, v: int, info: ValidationInfo) -> int:
+        """Validate MX record priority."""
+        if not isinstance(v, int):
+            raise ValueError("Priority must be an integer")
+        if v < 0:
+            raise ValueError("Priority must be non-negative")
+        if v > 65535:
+            raise ValueError("Priority must not exceed 65535")
         return v
+
+    @field_validator("value")
+    @classmethod
+    def validate_mx_hostname(cls, v: str, info: ValidationInfo) -> str:
+        """Validate hostname."""
+        if not v or not isinstance(v, str):
+            raise ValueError("Hostname must be a non-empty string")
+        if v.endswith("."):
+            v = v[:-1]  # Remove trailing dot for length check
+        if len(v) > 253:
+            raise ValueError("Domain name exceeds maximum length")
+        # Validate hostname format
+        if not re.match(
+            r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$",
+            v,
+        ):
+            raise ValueError("Invalid hostname for MX record")
+        return v
+
+    class Config:
+        validate_assignment = True
+        extra = "allow"
 
 
 class TXTRecord(RecordModel):
     """TXT record type."""
 
-    type: Literal["TXT"] = Field(default="TXT")
+    type: Literal["TXT"] = Field(default="TXT", description="Record type")
 
-    @validator("value")
-    def validate_txt(cls, v: str) -> str:
+    @field_validator("value")
+    @classmethod
+    def validate_txt(cls, v: str, info: ValidationInfo) -> str:
         """Validate TXT record value."""
+        if not v or not isinstance(v, str):
+            raise ValueError("TXT value must be a non-empty string")
         if len(v) > 255:
-            raise ValueError("TXT record value exceeds 255 characters")
+            raise ValueError("TXT value too long")
         return v
 
 
 class CAARecord(RecordModel):
     """CAA record type."""
 
-    type: Literal["CAA"] = Field(default="CAA")
+    type: Literal["CAA"] = Field(default="CAA", description="Record type")
     flags: int = Field(default=0, ge=0, le=255)
-    tag: Literal["issue", "issuewild", "iodef"] = Field(default=...)
+    tag: Literal["issue", "issuewild", "iodef"] = Field(...)
 
-    @validator("value")
-    def validate_caa(cls, v: str) -> str:
+    @field_validator("value")
+    @classmethod
+    def validate_caa(cls, v: str, info: ValidationInfo) -> str:
         """Validate CAA record value."""
-        if not v.startswith('"') or not v.endswith('"'):
-            raise ValueError("CAA record value must be quoted")
+        if not v or not isinstance(v, str):
+            raise ValueError("CAA value must be a non-empty string")
+        if len(v) > 255:
+            raise ValueError("CAA value too long")
         return v
 
 
@@ -114,7 +159,7 @@ class RecordGroupManager:
         """Initialize record group manager."""
         self.groups: Dict[str, RecordGroup] = {}
 
-    def add_group(self, group: RecordGroup) -> None:
+    def add_group(self, group: RecordGroup):
         """Add a record group.
 
         Args:
@@ -149,10 +194,15 @@ class RecordGroupManager:
 
         Returns:
             Combined list of records
+
+        Raises:
+            KeyError: If a group is not found
         """
-        records: List[RecordModel] = []
-        for group in groups:
-            if group_obj := self.get_group(group):
-                if group_obj.enabled:
-                    records.extend(group_obj.records)
+        records = []
+        for group_name in groups:
+            group = self.groups.get(group_name)
+            if not group:
+                raise KeyError(f"Record group not found: {group_name}")
+            if group.enabled:
+                records.extend(group.records)
         return records

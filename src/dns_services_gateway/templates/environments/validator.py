@@ -1,4 +1,5 @@
 """Environment validator for DNS template configurations."""
+
 from typing import Dict, List, Set
 import re
 

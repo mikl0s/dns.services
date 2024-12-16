@@ -418,3 +418,396 @@ async def test_list_domains_bulk_without_metadata(domain_ops, mock_client):
         "/domains/list",
         params={"page": 1, "per_page": 20, "include_metadata": "0"},
     )
+
+
+async def test_get_registry_lock_status(domain_ops, mock_client):
+    """Test getting registry lock status."""
+    mock_response = {
+        "enabled": True,
+        "last_updated": "2024-12-15T03:11:04Z",
+        "locked_by": "admin",
+    }
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.get_registry_lock_status("example.com")
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert response.operation == "get_registry_lock_status"
+    assert response.data["enabled"] is True
+    assert response.metadata["domain"] == "example.com"
+
+    mock_client.get.assert_called_with("/domain/example.com/reglock")
+
+
+async def test_update_registry_lock(domain_ops, mock_client):
+    """Test updating registry lock status."""
+    mock_response = {
+        "enabled": True,
+        "last_updated": "2024-12-15T03:11:04Z",
+        "locked_by": "admin",
+    }
+    mock_client.put.return_value = mock_response
+
+    response = await domain_ops.update_registry_lock("example.com", True)
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert response.operation == "update_registry_lock"
+    assert response.data["enabled"] is True
+    assert response.metadata["domain"] == "example.com"
+    assert response.metadata["enabled"] is True
+
+    mock_client.put.assert_called_with(
+        "/domain/example.com/reglock", json={"enabled": True}
+    )
+
+
+async def test_get_domain_forwarding(domain_ops, mock_client):
+    """Test getting domain forwarding configuration."""
+    mock_response = {
+        "enabled": True,
+        "target_url": "https://target.com",
+        "preserve_path": True,
+        "include_query": True,
+    }
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.get_domain_forwarding("example.com")
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert response.data["enabled"] is True
+    assert response.data["target_url"] == "https://target.com"
+
+    mock_client.get.assert_called_with("/domain/example.com/forwarding")
+
+
+async def test_update_domain_forwarding(domain_ops, mock_client):
+    """Test updating domain forwarding configuration."""
+    mock_response = {
+        "enabled": True,
+        "target_url": "https://target.com",
+        "preserve_path": True,
+        "include_query": True,
+    }
+    mock_client.put.return_value = mock_response
+
+    response = await domain_ops.update_domain_forwarding(
+        "example.com", "https://target.com", preserve_path=True, include_query=True
+    )
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert response.data["enabled"] is True
+    assert response.data["target_url"] == "https://target.com"
+
+    mock_client.put.assert_called_with(
+        "/domain/example.com/forwarding",
+        json={
+            "target_url": "https://target.com",
+            "preserve_path": True,
+            "include_query": True,
+        },
+    )
+
+
+async def test_create_dns_record(domain_ops, mock_client):
+    """Test creating DNS record."""
+    mock_response = {
+        "id": "record1",
+        "type": "A",
+        "name": "www",
+        "content": "192.0.2.1",
+        "ttl": 3600,
+    }
+    mock_client.post.return_value = mock_response
+
+    response = await domain_ops.create_dns_record(
+        "example.com", "A", "www", "192.0.2.1", ttl=3600
+    )
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert response.data["type"] == "A"
+    assert response.data["content"] == "192.0.2.1"
+
+    mock_client.post.assert_called_with(
+        "/domain/example.com/dns",
+        json={"type": "A", "name": "www", "content": "192.0.2.1", "ttl": 3600},
+    )
+
+
+async def test_create_dns_record_with_priority(domain_ops, mock_client):
+    """Test creating MX record with priority."""
+    mock_response = {
+        "id": "record1",
+        "type": "MX",
+        "name": "@",
+        "content": "mail.example.com",
+        "ttl": 3600,
+        "priority": 10,
+    }
+    mock_client.post.return_value = mock_response
+
+    response = await domain_ops.create_dns_record(
+        "example.com", "MX", "@", "mail.example.com", ttl=3600, priority=10
+    )
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert response.data["type"] == "MX"
+    assert response.data["priority"] == 10
+
+    mock_client.post.assert_called_with(
+        "/domain/example.com/dns",
+        json={
+            "type": "MX",
+            "name": "@",
+            "content": "mail.example.com",
+            "ttl": 3600,
+            "priority": 10,
+        },
+    )
+
+
+async def test_delete_dns_record(domain_ops, mock_client):
+    """Test deleting DNS record."""
+    mock_response = {"status": "success"}
+    mock_client.delete.return_value = mock_response
+
+    response = await domain_ops.delete_dns_record("example.com", 1)
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+
+    mock_client.delete.assert_called_with("/domain/example.com/dns/1")
+
+
+async def test_batch_dns_operations(domain_ops, mock_client):
+    """Test batch DNS operations."""
+    mock_responses = [
+        {
+            "id": "record1",
+            "type": "A",
+            "name": "www",
+            "content": "192.0.2.1",
+            "ttl": 3600,
+        },
+        {"status": "success"},
+    ]
+    mock_client.post.side_effect = mock_responses[0:1]
+    mock_client.delete.return_value = mock_responses[1]
+
+    operations = [
+        {
+            "action": "create",
+            "domain": "example.com",
+            "record_data": {"type": "A", "name": "www", "content": "192.0.2.1"},
+        },
+        {"action": "delete", "domain": "example.com", "record_id": 1},
+    ]
+
+    responses = await domain_ops.batch_dns_operations(operations)
+    assert len(responses) == 2
+    assert all(isinstance(r, OperationResponse) for r in responses)
+    assert all(r.status == "success" for r in responses)
+
+    mock_client.post.assert_called_with(
+        "/domain/example.com/dns",
+        json={"type": "A", "name": "www", "content": "192.0.2.1", "ttl": 3600},
+    )
+    mock_client.delete.assert_called_with("/domain/example.com/dns/1")
+
+
+async def test_list_dns_records(domain_ops, mock_client):
+    """Test listing DNS records."""
+    mock_response = {
+        "records": [
+            {
+                "id": "record1",
+                "type": "A",
+                "name": "www",
+                "content": "192.0.2.1",
+                "ttl": 3600,
+            },
+            {
+                "id": "record2",
+                "type": "MX",
+                "name": "@",
+                "content": "mail.example.com",
+                "ttl": 3600,
+                "priority": 10,
+            },
+        ]
+    }
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.list_dns_records("example.com")
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert len(response.data["records"]) == 2
+
+    mock_client.get.assert_called_with("/domain/example.com/dns")
+
+    # Test with record type filter
+    mock_client.get.reset_mock()
+    response = await domain_ops.list_dns_records("example.com", record_type="A")
+    mock_client.get.assert_called_with("/domain/example.com/dns", params={"type": "A"})
+
+
+async def test_get_nameservers(domain_ops, mock_client):
+    """Test getting nameservers."""
+    mock_response = {"nameservers": ["ns1.example.com", "ns2.example.com"]}
+    mock_client.get.return_value = mock_response
+
+    response = await domain_ops.get_nameservers("example.com")
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert len(response.data["nameservers"]) == 2
+
+    mock_client.get.assert_called_with("/domain/example.com/nameservers")
+
+
+async def test_update_nameservers(domain_ops, mock_client):
+    """Test updating nameservers."""
+    mock_response = {
+        "nameservers": ["ns1.example.com", "ns2.example.com"],
+        "status": "success",
+    }
+    mock_client.put.return_value = mock_response
+
+    nameservers = ["ns1.example.com", "ns2.example.com"]
+    response = await domain_ops.update_nameservers("example.com", nameservers)
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert response.data["nameservers"] == nameservers
+
+    mock_client.put.assert_called_with(
+        "/domain/example.com/nameservers", json={"nameservers": nameservers}
+    )
+
+
+async def test_register_nameservers(domain_ops, mock_client):
+    """Test registering nameservers."""
+    mock_response = {
+        "status": "success",
+        "registered": [
+            {"hostname": "ns1.example.com", "ip": "192.0.2.1"},
+            {"hostname": "ns2.example.com", "ip": "192.0.2.2"},
+        ],
+    }
+    mock_client.post.return_value = mock_response
+
+    nameservers = [
+        {"hostname": "ns1.example.com", "ip": "192.0.2.1"},
+        {"hostname": "ns2.example.com", "ip": "192.0.2.2"},
+    ]
+    response = await domain_ops.register_nameservers("example.com", nameservers)
+    assert isinstance(response, OperationResponse)
+    assert response.status == "success"
+    assert len(response.data["registered"]) == 2
+
+    mock_client.post.assert_called_with(
+        "/domain/example.com/nameservers/register", json={"nameservers": nameservers}
+    )
+
+
+async def test_error_handling_for_operations(domain_ops, mock_client):
+    """Test error handling for various operations."""
+    error_message = "API request failed"
+    mock_client.get.side_effect = Exception(error_message)
+    mock_client.post.side_effect = Exception(error_message)
+    mock_client.put.side_effect = Exception(error_message)
+    mock_client.delete.side_effect = Exception(error_message)
+
+    # Test registry lock operations
+    with pytest.raises(
+        APIError, match=f"Failed to get registry lock status: {error_message}"
+    ):
+        await domain_ops.get_registry_lock_status("example.com")
+
+    with pytest.raises(
+        APIError, match=f"Failed to update registry lock: {error_message}"
+    ):
+        await domain_ops.update_registry_lock("example.com", True)
+
+    # Test forwarding operations
+    with pytest.raises(
+        APIError, match=f"Failed to get domain forwarding: {error_message}"
+    ):
+        await domain_ops.get_domain_forwarding("example.com")
+
+    with pytest.raises(
+        APIError, match=f"Failed to update domain forwarding: {error_message}"
+    ):
+        await domain_ops.update_domain_forwarding("example.com", "https://target.com")
+
+    # Test DNS record operations
+    with pytest.raises(APIError, match=f"Failed to create DNS record: {error_message}"):
+        await domain_ops.create_dns_record("example.com", "A", "www", "192.0.2.1")
+
+    with pytest.raises(APIError, match=f"Failed to delete DNS record: {error_message}"):
+        await domain_ops.delete_dns_record("example.com", 1)
+
+    with pytest.raises(APIError, match=f"Failed to list DNS records: {error_message}"):
+        await domain_ops.list_dns_records("example.com")
+
+    # Test nameserver operations
+    with pytest.raises(APIError, match=f"Failed to get nameservers: {error_message}"):
+        await domain_ops.get_nameservers("example.com")
+
+    with pytest.raises(
+        APIError, match=f"Failed to update nameservers: {error_message}"
+    ):
+        await domain_ops.update_nameservers("example.com", ["ns1.example.com"])
+
+    with pytest.raises(
+        APIError, match=f"Failed to register nameservers: {error_message}"
+    ):
+        await domain_ops.register_nameservers(
+            "example.com", [{"hostname": "ns1", "ip": "192.0.2.1"}]
+        )
+
+
+async def test_batch_dns_operations_validation(domain_ops):
+    """Test validation in batch DNS operations."""
+    with pytest.raises(ValueError, match="No operations provided"):
+        await domain_ops.batch_dns_operations([])
+
+    with pytest.raises(ValueError, match="Missing domain identifier"):
+        await domain_ops.batch_dns_operations([{"action": "create"}])
+
+    with pytest.raises(ValueError, match="Missing record data"):
+        await domain_ops.batch_dns_operations(
+            [{"action": "create", "domain": "example.com"}]
+        )
+
+    with pytest.raises(ValueError, match="Missing required fields"):
+        await domain_ops.batch_dns_operations(
+            [
+                {
+                    "action": "create",
+                    "domain": "example.com",
+                    "record_data": {"name": "www"},
+                }
+            ]
+        )
+
+    with pytest.raises(ValueError, match="Missing record ID"):
+        await domain_ops.batch_dns_operations(
+            [{"action": "delete", "domain": "example.com"}]
+        )
+
+    with pytest.raises(ValueError, match="Invalid action"):
+        await domain_ops.batch_dns_operations(
+            [{"action": "invalid", "domain": "example.com"}]
+        )
+
+
+async def test_dns_record_validation(domain_ops, mock_client):
+    """Test validation for DNS record operations."""
+    with pytest.raises(ValueError, match="Missing required fields"):
+        await domain_ops.create_dns_record("", "A", "www", "192.0.2.1")
+
+    with pytest.raises(ValueError, match="Missing required fields"):
+        await domain_ops.create_dns_record("example.com", "", "www", "192.0.2.1")
+
+    with pytest.raises(ValueError, match="Missing required fields"):
+        await domain_ops.create_dns_record("example.com", "A", "", "192.0.2.1")
+
+    with pytest.raises(ValueError, match="Missing required fields"):
+        await domain_ops.create_dns_record("example.com", "A", "www", "")

@@ -24,6 +24,8 @@ class RecordType(str, Enum):
     NS = "NS"
     SRV = "SRV"
     CAA = "CAA"
+    PTR = "PTR"
+    SOA = "SOA"
 
 
 class RecordAction(str, Enum):
@@ -67,12 +69,38 @@ class AAAARecord(BaseRecord):
     type: Literal[RecordType.AAAA] = RecordType.AAAA
     value: str = Field(..., description="IPv6 address")
 
+    @field_validator("value")
+    @classmethod
+    def validate_ipv6(cls, v: str) -> str:
+        """Validate IPv6 address format."""
+        # Basic IPv6 validation
+        parts = v.split(":")
+        if len(parts) > 8 or len(parts) < 3:
+            raise ValueError("Invalid IPv6 address")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate record name."""
+        if not v:
+            raise ValueError("Record name cannot be empty")
+        return v
+
 
 class CNAMERecord(BaseRecord):
     """Model for CNAME record type."""
 
     type: Literal[RecordType.CNAME] = RecordType.CNAME
     value: str = Field(..., description="Target hostname")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        """Validate record name."""
+        if v == "@":
+            raise ValueError("CNAME record cannot be created for root domain")
+        return v
 
 
 class MXRecord(BaseRecord):
@@ -170,7 +198,11 @@ class DNSRecordManager:
         response = await self._client.make_request(
             method=method,
             endpoint=endpoint,
-            data=request_data if method != "DELETE" else None,
+            data=(
+                request_data
+                if method != "DELETE"
+                else {"name": record.name, "type": record.type.value}
+            ),
         )
 
         verified = False

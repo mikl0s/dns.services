@@ -2,7 +2,7 @@
 
 import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 from dns_services_gateway.nameservers import NameserverManager
 from dns_services_gateway.models import NameserverResponse, OperationResponse
@@ -114,14 +114,17 @@ async def test_verify_nameservers_success(manager, client):
     domain = "example.com"
     nameservers = ["ns1.example.com.", "ns2.example.com."]
     client.get.return_value = {"nameservers": nameservers}
-    client.post.return_value = {"verified": True}
 
     result = await manager.verify_nameservers(domain, nameservers)
 
-    assert result is True
-    client.post.assert_called_once_with(
-        f"domain/{domain}/nameservers/verify", json={"nameservers": nameservers}
-    )
+    assert isinstance(result, OperationResponse)
+    assert result.status == "success"
+    assert result.operation == "verify_nameservers"
+    assert result.data["verified"] is True
+    assert result.data["current_nameservers"] == nameservers
+    assert result.data["expected_nameservers"] == nameservers
+    assert result.metadata["domain"] == domain
+    client.get.assert_called_once_with(f"/domain/{domain}")
 
 
 @pytest.mark.asyncio
@@ -130,21 +133,44 @@ async def test_verify_nameservers_current(manager, client):
     domain = "example.com"
     current_nameservers = ["ns1.example.com.", "ns2.example.com."]
     client.get.return_value = {"nameservers": current_nameservers}
-    client.post.return_value = {"verified": True}
 
-    result = await manager.verify_nameservers(domain)
+    result = await manager.verify_nameservers(domain, current_nameservers)
 
-    assert result is True
-    client.post.assert_called_once_with(
-        f"domain/{domain}/nameservers/verify",
-        json={"nameservers": current_nameservers},
-    )
+    assert isinstance(result, OperationResponse)
+    assert result.status == "success"
+    assert result.operation == "verify_nameservers"
+    assert result.data["verified"] is True
+    assert result.data["current_nameservers"] == current_nameservers
+    assert result.data["expected_nameservers"] == current_nameservers
+    assert result.metadata["domain"] == domain
+    client.get.assert_called_once_with(f"/domain/{domain}")
 
 
 @pytest.mark.asyncio
-async def test_verify_nameservers_api_error(manager, client):
-    """Test nameserver verification with API error."""
-    client.post.side_effect = Exception("API Error")
+async def test_verify_nameservers_mismatch(manager, client):
+    """Test verification when nameservers don't match."""
+    domain = "example.com"
+    current_nameservers = ["ns1.example.com.", "ns2.example.com."]
+    expected_nameservers = ["ns3.example.com.", "ns4.example.com."]
+    client.get.return_value = {"nameservers": current_nameservers}
 
+    result = await manager.verify_nameservers(domain, expected_nameservers)
+
+    assert isinstance(result, OperationResponse)
+    assert result.status == "success"
+    assert result.operation == "verify_nameservers"
+    assert result.data["verified"] is False
+    assert result.data["current_nameservers"] == current_nameservers
+    assert result.data["expected_nameservers"] == expected_nameservers
+    assert result.metadata["domain"] == domain
+    client.get.assert_called_once_with(f"/domain/{domain}")
+
+
+@pytest.mark.asyncio
+async def test_verify_nameservers_api_error():
+    """Test verify_nameservers with API error."""
+    client = Mock()
+    manager = NameserverManager(client)
+    client.request = Mock(side_effect=DNSServicesError("API Error"))
     with pytest.raises(DNSServicesError):
-        await manager.verify_nameservers("example.com", ["ns1.example.com."])
+        await manager.verify_nameservers("example.com", ["ns1.example.com"])

@@ -1,4 +1,5 @@
 """Environment configuration management for DNS templates."""
+
 import os
 from typing import Dict, Optional, Union
 from pydantic import BaseModel, Field

@@ -1,10 +1,11 @@
 """Change management system for DNS template configurations."""
+
 import json
 import logging
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 from ..models.settings import ChangeManagementSettings
 from .rollback import ChangeSet
@@ -391,3 +392,245 @@ class ChangeManager:
         self.logger.info(
             f"Would send Slack message to {channels}\n" f"Message: {message}"
         )
+
+    def diff_templates(
+        self, template1: Dict[str, Any], template2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare two templates and return differences.
+
+        Args:
+            template1: First template data
+            template2: Second template data
+
+        Returns:
+            Dictionary of differences
+        """
+        diff = {
+            "metadata": self._diff_dict(
+                template1.get("metadata", {}), template2.get("metadata", {})
+            ),
+            "variables": self._diff_dict(
+                template1.get("variables", {}), template2.get("variables", {})
+            ),
+            "environments": self._diff_dict(
+                template1.get("environments", {}), template2.get("environments", {})
+            ),
+            "records": self._diff_records(
+                template1.get("records", {}), template2.get("records", {})
+            ),
+            "settings": self._diff_dict(
+                template1.get("settings", {}), template2.get("settings", {})
+            ),
+            "record_groups": self._diff_dict(
+                template1.get("record_groups", {}), template2.get("record_groups", {})
+            ),
+        }
+        return {k: v for k, v in diff.items() if v}
+
+    def _diff_dict(
+        self, dict1: Dict[str, Any], dict2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare two dictionaries and return differences.
+
+        Args:
+            dict1: First dictionary
+            dict2: Second dictionary
+
+        Returns:
+            Dictionary of differences
+        """
+        diff = {}
+        all_keys = set(dict1.keys()) | set(dict2.keys())
+        for key in all_keys:
+            if key not in dict1:
+                diff[key] = {"added": dict2[key]}
+            elif key not in dict2:
+                diff[key] = {"removed": dict1[key]}
+            elif dict1[key] != dict2[key]:
+                diff[key] = {"old": dict1[key], "new": dict2[key]}
+        return diff
+
+    def _diff_records(
+        self,
+        records1: Dict[str, List[Dict[str, Any]]],
+        records2: Dict[str, List[Dict[str, Any]]],
+    ) -> Dict[str, Any]:
+        """Compare two sets of records and return differences.
+
+        Args:
+            records1: First set of records
+            records2: Second set of records
+
+        Returns:
+            Dictionary of differences
+        """
+        diff = {}
+        all_types = set(records1.keys()) | set(records2.keys())
+        for record_type in all_types:
+            type_diff = []
+            records1_of_type = records1.get(record_type, [])
+            records2_of_type = records2.get(record_type, [])
+
+            # Compare records by name (assuming name is unique within a type)
+            records1_by_name = {r["name"]: r for r in records1_of_type}
+            records2_by_name = {r["name"]: r for r in records2_of_type}
+            all_names = set(records1_by_name.keys()) | set(records2_by_name.keys())
+
+            for name in all_names:
+                if name not in records1_by_name:
+                    type_diff.append({"added": records2_by_name[name]})
+                elif name not in records2_by_name:
+                    type_diff.append({"removed": records1_by_name[name]})
+                elif records1_by_name[name] != records2_by_name[name]:
+                    type_diff.append(
+                        {
+                            "name": name,
+                            "old": records1_by_name[name],
+                            "new": records2_by_name[name],
+                        }
+                    )
+
+            if type_diff:
+                diff[record_type] = type_diff
+
+        return diff
+
+    def compare_templates(
+        self, template1: Dict[str, Any], template2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare two templates and return the differences.
+
+        Args:
+            template1: First template
+            template2: Second template
+
+        Returns:
+            Dictionary containing differences between templates
+        """
+        differences = {
+            "variables": self._compare_variables(
+                template1.get("variables", {}), template2.get("variables", {})
+            ),
+            "environments": self._compare_environments(
+                template1.get("environments", {}), template2.get("environments", {})
+            ),
+            "records": self._compare_records(
+                template1.get("records", {}), template2.get("records", {})
+            ),
+            "settings": self._compare_settings(
+                template1.get("settings", {}), template2.get("settings", {})
+            ),
+        }
+        return differences
+
+    def _compare_variables(
+        self, vars1: Dict[str, Any], vars2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare two sets of variables.
+
+        Args:
+            vars1: First set of variables
+            vars2: Second set of variables
+
+        Returns:
+            Dictionary containing differences between variables
+        """
+        diff = {
+            "added": [],
+            "removed": [],
+            "modified": [],
+        }
+
+        for key in set(vars1.keys()) | set(vars2.keys()):
+            if key not in vars1:
+                diff["added"].append(key)
+            elif key not in vars2:
+                diff["removed"].append(key)
+            elif vars1[key] != vars2[key]:
+                diff["modified"].append(key)
+
+        return diff
+
+    def _compare_environments(
+        self, envs1: Dict[str, Any], envs2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare two sets of environments.
+
+        Args:
+            envs1: First set of environments
+            envs2: Second set of environments
+
+        Returns:
+            Dictionary containing differences between environments
+        """
+        diff = {
+            "added": [],
+            "removed": [],
+            "modified": [],
+        }
+
+        for key in set(envs1.keys()) | set(envs2.keys()):
+            if key not in envs1:
+                diff["added"].append(key)
+            elif key not in envs2:
+                diff["removed"].append(key)
+            elif envs1[key] != envs2[key]:
+                diff["modified"].append(key)
+
+        return diff
+
+    def _compare_records(
+        self, records1: Dict[str, Any], records2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare two sets of records.
+
+        Args:
+            records1: First set of records
+            records2: Second set of records
+
+        Returns:
+            Dictionary containing differences between records
+        """
+        diff = {
+            "added": [],
+            "removed": [],
+            "modified": [],
+        }
+
+        for key in set(records1.keys()) | set(records2.keys()):
+            if key not in records1:
+                diff["added"].append(key)
+            elif key not in records2:
+                diff["removed"].append(key)
+            elif records1[key] != records2[key]:
+                diff["modified"].append(key)
+
+        return diff
+
+    def _compare_settings(
+        self, settings1: Dict[str, Any], settings2: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Compare two sets of settings.
+
+        Args:
+            settings1: First set of settings
+            settings2: Second set of settings
+
+        Returns:
+            Dictionary containing differences between settings
+        """
+        diff = {
+            "added": [],
+            "removed": [],
+            "modified": [],
+        }
+
+        for key in set(settings1.keys()) | set(settings2.keys()):
+            if key not in settings1:
+                diff["added"].append(key)
+            elif key not in settings2:
+                diff["removed"].append(key)
+            elif settings1[key] != settings2[key]:
+                diff["modified"].append(key)
+
+        return diff

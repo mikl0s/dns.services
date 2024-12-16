@@ -191,6 +191,50 @@ def test_load_token_invalid_format(tmp_path):
         TokenManager.load_token(token_path)
 
 
+def test_token_manager_request_methods(token_manager, mock_response):
+    """Test TokenManager's HTTP request methods."""
+    token_manager._session.request = mock.Mock(return_value=mock_response)
+
+    # Test GET request
+    response = token_manager.get("https://api.test/endpoint")
+    token_manager._session.request.assert_called_with(
+        "GET", "https://api.test/endpoint", headers={}
+    )
+    assert response == mock_response
+
+    # Test POST request
+    data = {"key": "value"}
+    response = token_manager.post("https://api.test/endpoint", json=data)
+    token_manager._session.request.assert_called_with(
+        "POST", "https://api.test/endpoint", json=data, headers={}
+    )
+    assert response == mock_response
+
+
+def test_secure_write_token_permission_error(token_manager, tmp_path):
+    """Test _secure_write_token handles permission errors."""
+    token_path = tmp_path / "token"
+
+    # Create a read-only directory
+    token_path.parent.mkdir(mode=0o500, exist_ok=True)
+
+    # Make the directory read-only for the current user
+    os.chmod(token_path.parent, 0o444)
+
+    with pytest.raises(TokenError, match="Failed to save token"):
+        token_manager._secure_write_token({"token": "test_token"}, token_path)
+
+    # Restore permissions for cleanup
+    os.chmod(token_path.parent, 0o755)
+
+
+def test_token_manager_session_property(token_manager):
+    """Test TokenManager's session property."""
+    session = token_manager.session
+    assert isinstance(session, requests.Session)
+    assert session.verify == token_manager.config.verify_ssl
+
+
 def test_basic_auth_header_generation():
     """Test Basic Authentication header generation."""
     config = DNSServicesConfig(

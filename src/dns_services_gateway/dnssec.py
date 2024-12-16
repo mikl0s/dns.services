@@ -31,6 +31,44 @@ class DNSSECResponse(BaseModel):
     keys: Optional[List[DNSSECKey]] = Field(None, description="List of DNSSEC keys")
 
 
+class DNSSECKeyConfig(BaseModel):
+    """Model representing DNSSEC key configuration."""
+
+    algorithm: int = Field(..., description="DNSSEC algorithm number")
+    key_size: int = Field(..., description="Key size in bits")
+    rotation_interval: int = Field(..., description="Key rotation interval in days")
+    signing_practice: str = Field(..., description="Key signing practice (KSK/ZSK)")
+
+
+class DNSSECSigningConfig(BaseModel):
+    """Model representing DNSSEC signing configuration."""
+
+    enabled: bool = Field(..., description="Whether DNSSEC signing is enabled")
+    auto_signing: bool = Field(..., description="Whether auto-signing is enabled")
+    nsec3: bool = Field(False, description="Whether NSEC3 is enabled")
+    nsec3_iterations: Optional[int] = Field(
+        None, description="NSEC3 iterations if enabled"
+    )
+    nsec3_salt_length: Optional[int] = Field(
+        None, description="NSEC3 salt length if enabled"
+    )
+    key_config: DNSSECKeyConfig = Field(..., description="Key configuration")
+
+
+class DNSSECStatus(BaseModel):
+    """Model representing DNSSEC status."""
+
+    domain: str = Field(..., description="Domain name")
+    is_signed: bool = Field(..., description="Whether the domain is DNSSEC signed")
+    keys: List[DNSSECKey] = Field(
+        default_factory=list, description="Active DNSSEC keys"
+    )
+    next_key_event: Optional[str] = Field(None, description="Next scheduled key event")
+    ds_records: List[str] = Field(default_factory=list, description="DS records")
+    validation_status: str = Field(..., description="DNSSEC validation status")
+    last_signed: Optional[str] = Field(None, description="Last signing timestamp")
+
+
 class DNSSECManager:
     """Manager class for DNSSEC operations."""
 
@@ -120,3 +158,87 @@ class DNSSECManager:
             )
         except APIError as e:
             return DNSSECResponse(success=False, message=str(e), keys=None)
+
+    async def generate_key(self, domain: str, config: DNSSECKeyConfig) -> DNSSECKey:
+        """Generate a new DNSSEC key for a domain."""
+        try:
+            data = config.model_dump()
+            response = await self.client.post(
+                f"/domain/{domain}/dnssec/generate", data=data
+            )
+            return DNSSECKey(**response["key"])
+        except APIError as e:
+            raise APIError(str(e))
+
+    async def rotate_keys(self, domain: str) -> DNSSECResponse:
+        """Rotate DNSSEC keys for a domain.
+
+        Args:
+            domain: The domain name to rotate keys for
+
+        Returns:
+            DNSSECResponse containing the operation result
+        """
+        try:
+            response = await self.client.post(  # type: ignore
+                f"/domain/{domain}/dnssec/rotate"
+            )
+            return DNSSECResponse(
+                success=True,
+                message="Successfully rotated DNSSEC keys",
+                keys=[DNSSECKey(**key) for key in response.get("keys", [])],
+            )
+        except APIError as e:
+            return DNSSECResponse(success=False, message=str(e), keys=None)
+
+    async def manage_ds_records(
+        self, domain: str, operation: str, records: List[str]
+    ) -> DNSSECResponse:
+        """Manage DS records for a domain.
+
+        Args:
+            domain: The domain name
+            operation: Operation to perform ('add' or 'remove')
+            records: List of DS records
+
+        Returns:
+            DNSSECResponse containing the operation result
+        """
+        try:
+            data = {"operation": operation, "records": records}
+            response = await self.client.post(  # type: ignore
+                f"/domain/{domain}/dnssec/ds", data=data
+            )
+            return DNSSECResponse(
+                success=True,
+                message=f"Successfully {operation}ed DS records",
+                keys=None,
+            )
+        except APIError as e:
+            return DNSSECResponse(success=False, message=str(e), keys=None)
+
+    async def configure_signing(self, domain: str, config: DNSSECSigningConfig) -> bool:
+        """Configure DNSSEC signing for a domain."""
+        try:
+            data = config.model_dump()
+            response = await self.client.put(
+                f"/domain/{domain}/dnssec/signing", data=data
+            )
+            return True
+        except APIError as e:
+            raise APIError(str(e))
+
+    async def get_status(self, domain: str) -> DNSSECStatus:
+        """Get DNSSEC status for a domain.
+
+        Args:
+            domain: The domain name
+
+        Returns:
+            DNSSECStatus containing the current DNSSEC status
+
+        Raises:
+            APIError: If the API request fails
+        """
+        response = await self.client.get(f"/domain/{domain}/dnssec/status")  # type: ignore
+        return DNSSECStatus(**response)

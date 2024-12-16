@@ -1,20 +1,22 @@
 """Settings models for DNS template configurations."""
-from typing import List, Optional
-from pydantic import BaseModel, Field, validator
+
+from datetime import datetime
+from typing import Optional, Any
+from pydantic import BaseModel, Field
 
 
 class NotificationConfig(BaseModel):
     """Configuration for change notifications."""
 
-    email: Optional[List[str]] = Field(
+    email: Optional[list[str]] = Field(
         default=None, description="Email addresses for notifications"
     )
-    slack: Optional[List[str]] = Field(
+    slack: Optional[list[str]] = Field(
         default=None, description="Slack channels for notifications"
     )
 
-    @validator("email")
-    def validate_email(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    @classmethod
+    def validate_email(cls, v: Optional[list[str]]) -> Optional[list[str]]:
         """Validate email addresses."""
         if v is not None:
             import re
@@ -27,8 +29,8 @@ class NotificationConfig(BaseModel):
                     raise ValueError(f"Invalid email address: {email}")
         return v
 
-    @validator("slack")
-    def validate_slack(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+    @classmethod
+    def validate_slack(cls, v: Optional[list[str]]) -> Optional[list[str]]:
         """Validate Slack channel names."""
         if v is not None:
             for channel in v:
@@ -36,31 +38,80 @@ class NotificationConfig(BaseModel):
                     raise ValueError(f"Slack channel must start with #: {channel}")
         return v
 
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a setting value.
+
+        Args:
+            key: Setting key
+            default: Default value if key not found
+
+        Returns:
+            Setting value or default if not found
+        """
+        return getattr(self, key, default)
+
 
 class BackupSettings(BaseModel):
-    """Backup configuration settings."""
+    """Backup settings for templates."""
 
-    enabled: bool = Field(default=True, description="Enable automatic backups")
-    retention: int = Field(
-        default=30, description="Number of days to retain backups", ge=1, le=365
-    )
+    enabled: bool = Field(default=True, description="Enable backups")
+    directory: str = Field(default="backups", description="Backup directory")
+    retention_days: int = Field(default=30, description="Backup retention in days")
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a setting value.
+
+        Args:
+            key: Setting key
+            default: Default value if key not found
+
+        Returns:
+            Setting value or default if not found
+        """
+        return getattr(self, key, default)
 
 
 class RollbackSettings(BaseModel):
-    """Rollback configuration settings."""
+    """Rollback settings for templates."""
 
-    enabled: bool = Field(default=True, description="Enable rollback capability")
-    automatic: bool = Field(default=True, description="Automatically rollback on error")
+    enabled: bool = Field(default=True, description="Enable rollback")
+    max_changes: int = Field(default=10, description="Maximum changes to track")
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a setting value.
+
+        Args:
+            key: Setting key
+            default: Default value if key not found
+
+        Returns:
+            Setting value or default if not found
+        """
+        return getattr(self, key, default)
 
 
 class ChangeManagementSettings(BaseModel):
-    """Change management configuration settings."""
+    """Change management settings for templates."""
 
+    enabled: bool = Field(default=True, description="Enable change management")
+    changes_dir: str = Field(default="changes", description="Changes directory")
     require_approval: bool = Field(
         default=True, description="Require approval for changes"
     )
-    notify: NotificationConfig = Field(
-        default_factory=lambda: NotificationConfig(),
+    notify: "NotificationConfig" = Field(
+        default_factory=NotificationConfig,
         description="Notification configuration",
     )
     dry_run: bool = Field(default=False, description="Run in dry-run mode")
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a setting value.
+
+        Args:
+            key: Setting key
+            default: Default value if key not found
+
+        Returns:
+            Setting value or default if not found
+        """
+        return getattr(self, key, default)

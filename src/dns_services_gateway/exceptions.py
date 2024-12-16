@@ -257,6 +257,28 @@ class RequestError(Exception):
         super().__init__(message)
 
 
+class DomainError(DNSServicesError):
+    """Raised when there is an error with domain operations.
+
+    This can happen if:
+    - The domain does not exist
+    - The domain is not accessible
+    - The domain operation is not permitted
+    """
+
+    def __init__(
+        self, message: str, *args: Any, details: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """Initialize the domain error.
+
+        Args:
+            message: Human-readable error message
+            args: Additional positional arguments
+            details: Optional dictionary containing additional error details
+        """
+        super().__init__(message, *args, details=details)
+
+
 class AuthResponse:
     """Authentication response model.
 

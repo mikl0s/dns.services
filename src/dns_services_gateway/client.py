@@ -218,53 +218,52 @@ class DNSServicesClient:
             )
             response.raise_for_status()
             return response
+        except requests.exceptions.Timeout as e:
+            raise RequestError(f"Request timed out: {e}")
+        except requests.exceptions.ConnectionError as e:
+            raise RequestError(f"Connection failed: {e}")
+        except requests.exceptions.HTTPError as e:
+            raise RequestError(str(e))
         except RequestException as e:
             raise RequestError(f"Request failed: {e}")
+
+    def _parse_json_response(self, response: requests.Response) -> Dict[str, Any]:
+        """Parse JSON response from the API.
+
+        Args:
+            response: Response from the API
+
+        Returns:
+            Dict[str, Any]: Parsed JSON response
+
+        Raises:
+            APIError: If JSON parsing fails
+        """
+        try:
+            return response.json()
+        except ValueError as e:
+            raise APIError(
+                "Failed to parse JSON response",
+                status_code=response.status_code,
+                response_body={"error": "Invalid JSON"},
+            )
 
     def get(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a GET request to the API."""
         response = self._request("GET", path, **kwargs)
-        try:
-            return response.json()
-        except ValueError as e:
-            raise APIError(
-                f"Failed to parse JSON response: {str(e)}",
-                status_code=response.status_code,
-                response_body={"error": str(e)},
-            )
+        return self._parse_json_response(response)
 
     def post(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a POST request to the API."""
         response = self._request("POST", path, **kwargs)
-        try:
-            return response.json()
-        except ValueError as e:
-            raise APIError(
-                f"Failed to parse JSON response: {str(e)}",
-                status_code=response.status_code,
-                response_body={"error": str(e)},
-            )
+        return self._parse_json_response(response)
 
     def put(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a PUT request to the API."""
         response = self._request("PUT", path, **kwargs)
-        try:
-            return response.json()
-        except ValueError as e:
-            raise APIError(
-                f"Failed to parse JSON response: {str(e)}",
-                status_code=response.status_code,
-                response_body={"error": str(e)},
-            )
+        return self._parse_json_response(response)
 
     def delete(self, path: str, **kwargs: Any) -> Dict[str, Any]:
         """Make a DELETE request to the API."""
         response = self._request("DELETE", path, **kwargs)
-        try:
-            return response.json()
-        except ValueError as e:
-            raise APIError(
-                f"Failed to parse JSON response: {str(e)}",
-                status_code=response.status_code,
-                response_body={"error": str(e)},
-            )
+        return self._parse_json_response(response)
