@@ -373,7 +373,39 @@ def apply(
             if hasattr(template_data.variables, "get_variables"):
                 variables = template_data.variables.get_variables()
             elif isinstance(template_data.variables, dict):
-                variables = template_data.variables
+                base_vars = {}
+
+                # Handle root level variables
+                for key in ["domain", "ttl"]:
+                    if key in template_data.variables:
+                        value = template_data.variables[key]
+                        description = ""
+                        if isinstance(value, dict):
+                            description = value.get("description", "")
+                            value = value.get("value", "")
+                        base_vars[key] = SingleVariableModel(
+                            name=key,
+                            value=str(value),
+                            description=description,
+                        )
+
+                # Handle custom variables
+                custom_vars = template_data.variables.get("custom_vars", {})
+                for name, var in custom_vars.items():
+                    if isinstance(var, dict):
+                        base_vars[name] = SingleVariableModel(
+                            name=name,
+                            value=str(var.get("value", "")),
+                            description=var.get("description", ""),
+                        )
+                    else:
+                        base_vars[name] = SingleVariableModel(
+                            name=name,
+                            value=str(var),
+                            description="",
+                        )
+
+                variables = base_vars
             else:
                 variables = template_data.variables.model_dump()
 

@@ -163,34 +163,98 @@ class TemplateValidator:
             variables = {var.name: var.value for var in variables}
             self.template_data["variables"] = variables
 
+        # Handle _descriptions field
+        descriptions = {}
+        if isinstance(variables, dict):
+            descriptions = variables.pop("_descriptions", {}) if variables else {}
+
         # Update the variables set for reference validation
-        self.variables = set(variables.keys())
+        base_vars = set()
+        if isinstance(variables, dict):
+            # Add root level variables
+            for key in ["domain", "ttl"]:
+                if key in variables:
+                    base_vars.add(key)
+
+            # Add custom variables
+            custom_vars = variables.get("custom_vars", {})
+            for name, var in custom_vars.items():
+                if isinstance(var, dict) and "value" in var:
+                    base_vars.add(name)
+                else:
+                    base_vars.add(name)
+
+        self.variables = base_vars
 
         # Validate each variable
-        for name, value in variables.items():
-            if not isinstance(name, str):
-                result.add_error(f"Variable name must be a string: {name}")
-                continue
+        if isinstance(variables, dict):
+            # Validate root level variables
+            for name in ["domain", "ttl"]:
+                if name in variables:
+                    value = variables[name]
+                    if not isinstance(name, str):
+                        result.add_error(f"Variable name must be a string: {name}")
+                        continue
 
-            if name == "":
-                result.add_error("Variable name cannot be empty")
-                continue
+                    if name == "":
+                        result.add_error("Variable name cannot be empty")
+                        continue
 
-            if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-                result.add_error(
-                    f"Invalid variable name '{name}'. Must start with a letter and contain only letters, numbers, and underscores"
-                )
+                    if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
+                        result.add_error(
+                            f"Invalid variable name '{name}'. Must start with a letter and contain only letters, numbers, and underscores"
+                        )
 
-            # Validate TTL values
-            if name == "ttl":
-                try:
-                    ttl = int(value)
-                    if ttl < 0:
-                        result.add_error("TTL must be non-negative")
-                    elif ttl > 2147483647:  # Max 32-bit signed int
-                        result.add_error("TTL value is too large")
-                except (ValueError, TypeError):
-                    result.add_error("TTL must be a valid integer")
+                    # Validate TTL values
+                    if name == "ttl":
+                        try:
+                            ttl = int(value)
+                            if ttl < 0:
+                                result.add_error("TTL must be non-negative")
+                            elif ttl > 2147483647:  # Max 32-bit signed int
+                                result.add_error("TTL value is too large")
+                        except (ValueError, TypeError):
+                            result.add_error("TTL must be a valid integer")
+
+            # Validate custom variables
+            custom_vars = variables.get("custom_vars", {})
+            for name, var in custom_vars.items():
+                if not isinstance(name, str):
+                    result.add_error(f"Variable name must be a string: {name}")
+                    continue
+
+                if name == "":
+                    result.add_error("Variable name cannot be empty")
+                    continue
+
+                if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
+                    result.add_error(
+                        f"Invalid variable name '{name}'. Must start with a letter and contain only letters, numbers, and underscores"
+                    )
+
+                if isinstance(var, dict):
+                    if "value" not in var:
+                        result.add_error(
+                            f"Custom variable '{name}' must have a 'value' field"
+                        )
+                    value = var.get("value")
+                else:
+                    value = var
+
+                # Validate TTL values for any variable named ttl
+                if name == "ttl" or name.endswith("_ttl"):
+                    try:
+                        ttl = int(value)
+                        if ttl < 0:
+                            result.add_error(
+                                f"TTL value for '{name}' must be non-negative"
+                            )
+                        elif ttl > 2147483647:  # Max 32-bit signed int
+                            result.add_error(f"TTL value for '{name}' is too large")
+                    except (ValueError, TypeError):
+                        result.add_error(
+                            f"TTL value for '{name}' must be a valid integer"
+                        )
 
         return result
 

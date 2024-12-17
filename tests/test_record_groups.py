@@ -27,7 +27,7 @@ def test_a_record_validation():
     # Invalid IPv4
     with pytest.raises(ValidationError) as exc_info:
         ARecord(name="test", value="invalid", ttl=300, description="Invalid A record")
-    assert "Value error, Expected 4 octets in 'invalid'" in str(exc_info.value)
+    assert "Value error, Invalid IPv4 address: invalid" in str(exc_info.value)
 
     with pytest.raises(ValidationError) as exc_info:
         ARecord(
@@ -36,9 +36,7 @@ def test_a_record_validation():
             ttl=300,
             description="Invalid A record",
         )
-    assert "Value error, Octet 256 (> 255) not permitted in '256.256.256.256'" in str(
-        exc_info.value
-    )
+    assert "Value error, Invalid IPv4 address: 256.256.256.256" in str(exc_info.value)
 
 
 def test_aaaa_record_validation():
@@ -54,15 +52,13 @@ def test_aaaa_record_validation():
         AAAARecord(
             name="test", value="invalid", ttl=300, description="Invalid AAAA record"
         )
-    assert "Value error, At least 3 parts expected in 'invalid'" in str(exc_info.value)
+    assert "Value error, Invalid IPv6 address: invalid" in str(exc_info.value)
 
     with pytest.raises(ValidationError) as exc_info:
         AAAARecord(
             name="test", value="2001:zz8::1", ttl=300, description="Invalid AAAA record"
         )
-    assert "Value error, Only hex digits permitted in 'zz8' in '2001:zz8::1'" in str(
-        exc_info.value
-    )
+    assert "Value error, Invalid IPv6 address: 2001:zz8::1" in str(exc_info.value)
 
 
 def test_cname_record_validation():

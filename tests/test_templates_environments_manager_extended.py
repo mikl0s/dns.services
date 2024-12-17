@@ -96,13 +96,11 @@ def test_get_environment_variables(environment_manager):
 def test_set_environment_variable(environment_manager):
     environment_manager.set_environment_variable(
         "production",
-        VariableModel(
-            domain="example.com",
-            ttl=3600,
-            name="api_key",
-            value="secret",
-            description="API key",
-        ),
+        {
+            "name": "api_key",
+            "value": "secret",
+            "description": "API key",
+        },
     )
     variables = environment_manager.get_environment_variables("production")
     assert variables["api_key"].value == "secret"

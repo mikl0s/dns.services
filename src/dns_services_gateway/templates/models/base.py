@@ -325,12 +325,31 @@ class EnvironmentModel(BaseModel):
         for key, value in v.items():
             if isinstance(value, dict):
                 try:
-                    validated[key] = SingleVariableModel(**value)
-                except Exception:
-                    # If not a valid SingleVariableModel, store as is
-                    validated[key] = value
+                    if "value" in value:
+                        validated[key] = SingleVariableModel(
+                            name=key,
+                            value=str(value["value"]),
+                            description=value.get("description", ""),
+                        )
+                    else:
+                        validated[key] = SingleVariableModel(
+                            name=key,
+                            value=str(value),
+                            description="",
+                        )
+                except Exception as e:
+                    # If not a valid SingleVariableModel, convert to string
+                    validated[key] = SingleVariableModel(
+                        name=key,
+                        value=str(value),
+                        description="",
+                    )
             else:
-                validated[key] = value
+                validated[key] = SingleVariableModel(
+                    name=key,
+                    value=str(value),
+                    description="",
+                )
         return validated
 
     def model_dump(self, **kwargs) -> Dict[str, Any]:

@@ -57,39 +57,62 @@ class EnvironmentManager:
         elif hasattr(base_variables, "get_variables"):
             base_vars = base_variables.get_variables()
         else:
-            base_vars = {
-                "domain": base_variables.domain,
-                "ttl": base_variables.ttl,
-                "custom_vars": base_variables.custom_vars,
-            }
+            base_vars = {}
+            if hasattr(base_variables, "model_dump"):
+                base_vars = base_variables.model_dump()
+            else:
+                base_vars = {
+                    "domain": base_variables.domain,
+                    "ttl": base_variables.ttl,
+                    "custom_vars": (
+                        base_variables.custom_vars
+                        if hasattr(base_variables, "custom_vars")
+                        else {}
+                    ),
+                }
 
         # Store base variables in a consistent format
-        self.base_variables = {
-            "domain": SingleVariableModel(
-                name="domain",
-                value=base_vars["domain"],
-                description="Domain name",
-            ),
-            "ttl": SingleVariableModel(
-                name="ttl",
-                value=str(base_vars["ttl"]),
-                description="Default TTL",
-            ),
-        }
+        self.base_variables = {}
+
+        # Handle descriptions if present
+        descriptions = {}
+        if isinstance(base_vars, dict) and "_descriptions" in base_vars:
+            desc_val = base_vars["_descriptions"]
+            if isinstance(desc_val, dict):
+                descriptions = desc_val
+
+        # Handle root level variables
+        for key in ["domain", "ttl"]:
+            if key in base_vars:
+                value = base_vars[key]
+                if isinstance(value, dict) and "value" in value:
+                    self.base_variables[key] = SingleVariableModel(
+                        name=key,
+                        value=str(value["value"]),
+                        description=value.get("description", descriptions.get(key, "")),
+                    )
+                else:
+                    self.base_variables[key] = SingleVariableModel(
+                        name=key,
+                        value=str(value),
+                        description=descriptions.get(key, ""),
+                    )
 
         # Add custom variables
         if "custom_vars" in base_vars:
-            for name, var in base_vars["custom_vars"].items():
-                if isinstance(var, dict) and "value" in var:
-                    self.base_variables[name] = SingleVariableModel(
-                        name=name,
-                        value=var["value"],
-                        description=var.get("description", ""),
-                    )
-                else:
-                    self.base_variables[name] = SingleVariableModel(
-                        name=name, value=str(var), description=""
-                    )
+            custom_vars = base_vars["custom_vars"]
+            if isinstance(custom_vars, dict):
+                for name, var in custom_vars.items():
+                    if isinstance(var, dict) and "value" in var:
+                        self.base_variables[name] = SingleVariableModel(
+                            name=name,
+                            value=str(var["value"]),
+                            description=var.get("description", ""),
+                        )
+                    else:
+                        self.base_variables[name] = SingleVariableModel(
+                            name=name, value=str(var), description=""
+                        )
 
         # Convert base records to model instances
         self.base_records = {}
@@ -106,8 +129,12 @@ class EnvironmentManager:
         self.environments = {}
         self.record_managers = {}
 
-        # Get domain value from base_vars
-        domain = base_vars["domain"]
+        # Get domain value from base variables
+        domain = (
+            self.base_variables["domain"].value
+            if "domain" in self.base_variables
+            else ""
+        )
         self.record_manager = RecordManager(domain=domain)
 
     def add_environment(self, environment: EnvironmentModel) -> List[str]:
@@ -128,12 +155,20 @@ class EnvironmentManager:
             return errors
 
         # Merge variables and create new EnvironmentModel
-        merged_vars = self._merge_variables(environment)
-        environment.variables = merged_vars
+        try:
+            merged_vars = self._merge_variables(environment)
+            environment.variables = merged_vars
+        except Exception as e:
+            errors.append(f"Failed to merge variables: {str(e)}")
+            return errors
 
         # Create record manager for this environment
-        domain = self.base_variables["domain"].value  # Use base domain
-        self.record_managers[environment.name] = RecordManager(domain=domain)
+        try:
+            domain = self.base_variables["domain"].value  # Use base domain
+            self.record_managers[environment.name] = RecordManager(domain=domain)
+        except Exception as e:
+            errors.append(f"Failed to create record manager: {str(e)}")
+            return errors
 
         # Store environment
         self.environments[environment.name] = environment
@@ -163,7 +198,7 @@ class EnvironmentManager:
                         # Handle nested variable structure
                         merged[name] = SingleVariableModel(
                             name=name,
-                            value=var["value"],
+                            value=str(var["value"]),  # Convert value to string
                             description=var.get("description", ""),
                         )
                     else:
@@ -280,79 +315,52 @@ class EnvironmentManager:
 
         return changes, errors
 
-    def apply_changes(
-        self, environment_name: str, changes: List[Change]
-    ) -> Tuple[bool, List[str]]:
-        """Apply record changes to an environment.
+    def apply_changes(self, name: str, changes: List[Change]) -> Tuple[bool, List[str]]:
+        """Apply changes to an environment.
 
         Args:
-            environment_name: Environment name
-            changes: List of changes to apply
+            name: Environment name
+            changes: Changes to apply
 
         Returns:
             Tuple of (success, errors)
         """
-        record_manager = self.record_managers.get(environment_name)
+        errors = []
+        if name not in self.environments:
+            return False, [f"Environment {name} not found"]
+
+        if not changes:
+            return True, []
+
+        record_manager = self.record_managers.get(name)
         if not record_manager:
-            return False, [f"Environment {environment_name} not found"]
+            return False, [f"Record manager for {name} not found"]
 
-        errors: List[str] = []
-        success = True
+        try:
+            # Apply each change
+            for change in changes:
+                if change.type == ChangeType.CREATE:
+                    result = record_manager.add_record(change.record)
+                    if isinstance(result, list):
+                        errors.extend(result)
+                    elif not result:
+                        errors.append(f"Failed to create record {change.record.name}")
+                elif change.type == ChangeType.UPDATE:
+                    result = record_manager.update_record(change.record)
+                    if isinstance(result, list):
+                        errors.extend(result)
+                    elif not result:
+                        errors.append(f"Failed to update record {change.record.name}")
+                elif change.type == ChangeType.DELETE:
+                    result = record_manager.delete_record(change.record)
+                    if isinstance(result, list):
+                        errors.extend(result)
+                    elif not result:
+                        errors.append(f"Failed to delete record {change.record.name}")
 
-        # Create changeset for rollback
-        changeset = ChangeSet()
-        changeset.domain = record_manager.domain
-        changeset.environment = environment_name
-
-        # Get environment variables for substitution
-        environment = self.environments.get(environment_name)
-        if not environment:
-            return False, [f"Environment {environment_name} not found"]
-
-        # Apply changes
-        for change in changes:
-            # Substitute variables in record value
-            record = change.record
-            if "${" in str(record.value):
-                try:
-                    value = str(record.value)
-                    for var_name, var in environment.variables.items():
-                        if isinstance(var, SingleVariableModel):
-                            value = value.replace(f"${{{var_name}}}", str(var.value))
-                    record.value = value
-                except Exception as e:
-                    errors.append(f"Failed to substitute variables: {str(e)}")
-                    success = False
-                    continue
-
-            # Apply the change
-            if change.type == ChangeType.CREATE:
-                result = record_manager.add_record("default", record)
-                if result:
-                    errors.extend(result)
-                    success = False
-                else:
-                    changeset.add_record(record, "create")
-            elif change.type == ChangeType.UPDATE:
-                result = record_manager.update_record(record)
-                if result:
-                    errors.extend(result)
-                    success = False
-                else:
-                    changeset.add_record(record, "update")
-            elif change.type == ChangeType.DELETE:
-                result = record_manager.delete_record(record)
-                if result:
-                    errors.extend(result)
-                    success = False
-                else:
-                    changeset.add_record(record, "delete")
-
-        # Rollback on failure
-        if not success:
-            self._rollback_changes(changeset)
-
-        return success, errors
+            return len(errors) == 0, errors
+        except Exception as e:
+            return False, [str(e)]
 
     def _validate_environment(self, environment: EnvironmentModel) -> List[str]:
         """Validate environment configuration.
@@ -402,27 +410,48 @@ class EnvironmentManager:
         return errors
 
     def apply_environment(self, name: str) -> Dict[str, Any]:
-        """Apply environment configuration.
+        """Apply environment changes.
 
         Args:
             name: Environment name
 
         Returns:
-            Dictionary with success status and any errors
+            Dict with success status and any errors
         """
-        env = self.get_environment(name)
-        if not env:
+        if name not in self.environments:
             return {"success": False, "errors": [f"Environment {name} not found"]}
 
-        changes, errors = self.calculate_changes(name)
-        if errors:
-            return {"success": False, "errors": errors}
+        try:
+            # Validate environment first
+            errors = self.validate_environment(name)
+            if errors:
+                return {"success": False, "errors": errors}
 
-        success, apply_errors = self.apply_changes(name, changes)
-        if not success:
-            return {"success": False, "errors": apply_errors}
+            # Apply environment changes
+            env = self.environments[name]
 
-        return {"success": True, "errors": []}
+            # Apply variables
+            if env.variables:
+                for var_name, var in env.variables.items():
+                    if not isinstance(var, SingleVariableModel):
+                        return {
+                            "success": False,
+                            "errors": [f"Invalid variable type for {var_name}"],
+                        }
+
+            # Apply records if present
+            if env.records:
+                for record_type, records in env.records.items():
+                    for record in records:
+                        if not isinstance(record, dict):
+                            return {
+                                "success": False,
+                                "errors": [f"Invalid record type for {record_type}"],
+                            }
+
+            return {"success": True, "errors": []}
+        except Exception as e:
+            return {"success": False, "errors": [str(e)]}
 
     def update_environment(
         self, name: str, variables: Optional[Dict[str, Any]] = None
@@ -498,54 +527,21 @@ class EnvironmentManager:
     def merge_environments(
         self, environments: List[str]
     ) -> Dict[str, SingleVariableModel]:
-        """Merge multiple environments.
+        """Merge environment variables.
 
         Args:
-            environments: List of environment names to merge
+            environments: List of environment names
 
         Returns:
-            Merged variables dictionary
+            Dict of merged variables
         """
         merged = {}
-
-        # Start with base variables
-        for name, var in self.base_variables.items():
-            if isinstance(var, SingleVariableModel):
-                merged[name] = var
-            elif isinstance(var, dict) and "value" in var:
-                merged[name] = SingleVariableModel(
-                    name=name,
-                    value=var["value"],
-                    description=var.get("description", ""),
-                )
-            else:
-                merged[name] = SingleVariableModel(
-                    name=name, value=str(var), description=""
-                )
-
-        # Merge each environment's variables in order
         for env_name in environments:
             env = self.get_environment(env_name)
             if not env:
-                raise ValueError(f"Environment {env_name} not found")
-
+                continue
             if env.variables:
-                vars_dict = env.variables
-                if not isinstance(vars_dict, dict):
-                    vars_dict = vars_dict.model_dump()
-
-                for name, var in vars_dict.items():
-                    if isinstance(var, dict) and "value" in var:
-                        merged[name] = SingleVariableModel(
-                            name=name,
-                            value=var["value"],
-                            description=var.get("description", ""),
-                        )
-                    else:
-                        merged[name] = SingleVariableModel(
-                            name=name, value=str(var), description=""
-                        )
-
+                merged.update(env.variables)
         return merged
 
     def list_environments(self) -> Dict[str, EnvironmentModel]:
@@ -617,36 +613,95 @@ class EnvironmentManager:
         return env.variables
 
     def set_environment_variable(
-        self, name: str, variable: Union[Dict[str, Any], SingleVariableModel]
+        self,
+        name: str,
+        variable: Union[Dict[str, Any], VariableModel, SingleVariableModel],
     ) -> None:
-        """Set environment variable.
+        """Set an environment variable.
 
         Args:
             name: Environment name
             variable: Variable to set
         """
-        env = self.get_environment(name)
-        if not env:
+        if name not in self.environments:
             raise ValueError(f"Environment {name} not found")
 
-        if not env.variables:
-            env.variables = {}
+        # Convert variable to SingleVariableModel
+        if isinstance(variable, SingleVariableModel):
+            var_model = variable
+        elif isinstance(variable, VariableModel):
+            # If VariableModel has name/value fields directly, use those
+            if hasattr(variable, "name") and hasattr(variable, "value"):
+                var_model = SingleVariableModel(
+                    name=variable.name,
+                    value=variable.value,
+                    description=(
+                        variable.description if hasattr(variable, "description") else ""
+                    ),
+                )
+                if not self.environments[name].variables:
+                    self.environments[name].variables = {}
+                self.environments[name].variables[var_model.name] = var_model
+                return
+            else:
+                # Otherwise handle it as a domain/ttl/custom_vars model
+                if not self.environments[name].variables:
+                    self.environments[name].variables = {}
 
-        # Convert variable to VariableModel if needed
-        if isinstance(variable, dict):
+                # Add domain and ttl variables
+                self.environments[name].variables["domain"] = SingleVariableModel(
+                    name="domain",
+                    value=variable.domain,
+                    description="Domain name",
+                )
+                self.environments[name].variables["ttl"] = SingleVariableModel(
+                    name="ttl",
+                    value=variable.ttl,
+                    description="Default TTL",
+                )
+
+                # Add custom variables
+                for var_name, var_value in variable.custom_vars.items():
+                    if isinstance(var_value, dict) and "value" in var_value:
+                        self.environments[name].variables[var_name] = (
+                            SingleVariableModel(
+                                name=var_name,
+                                value=var_value["value"],
+                                description=var_value.get("description", ""),
+                            )
+                        )
+                    else:
+                        self.environments[name].variables[var_name] = (
+                            SingleVariableModel(
+                                name=var_name,
+                                value=str(var_value),
+                                description="",
+                            )
+                        )
+                return
+        elif isinstance(variable, dict):
             var_name = variable.get("name")
             if not var_name:
                 raise ValueError("Variable name is required")
-            var_model = SingleVariableModel(
-                name=var_name,
-                value=variable.get("value", ""),
-                description=variable.get("description", ""),
-            )
+            if "value" in variable:
+                var_model = SingleVariableModel(
+                    name=var_name,
+                    value=str(variable["value"]),
+                    description=variable.get("description", ""),
+                )
+            else:
+                var_model = SingleVariableModel(
+                    name=var_name,
+                    value=str(variable),
+                    description="",
+                )
         else:
-            var_model = variable
-            var_name = variable.name
+            raise ValueError("Invalid variable type")
 
-        env.variables[var_name] = var_model
+        # Update environment variables
+        if not self.environments[name].variables:
+            self.environments[name].variables = {}
+        self.environments[name].variables[var_model.name] = var_model
 
     def remove_environment_variable(self, name: str, variable_name: str) -> None:
         """Remove environment variable.

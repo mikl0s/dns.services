@@ -36,6 +36,11 @@ class VariableManager:
                     self._variables["domain"] = variables["domain"]
                 if "ttl" in variables:
                     self._variables["ttl"] = variables["ttl"]
+                # Update descriptions if present
+                if "_descriptions" in variables:
+                    desc_val = variables["_descriptions"]
+                    if isinstance(desc_val, dict):
+                        self._variables["_descriptions"].update(desc_val)
                 # Update custom variables
                 if "custom_vars" in variables:
                     self._variables["custom_vars"] = variables["custom_vars"]
@@ -197,6 +202,11 @@ class VariableManager:
                 self._variables["domain"] = variables["domain"]
             if "ttl" in variables:
                 self._variables["ttl"] = variables["ttl"]
+            # Update descriptions if present
+            if "_descriptions" in variables:
+                desc_val = variables["_descriptions"]
+                if isinstance(desc_val, dict):
+                    self._variables["_descriptions"].update(desc_val)
             # Update custom variables
             if "custom_vars" in variables:
                 self._variables["custom_vars"] = variables["custom_vars"]
@@ -217,6 +227,9 @@ class VariableManager:
             # Update base variables
             self._variables["domain"] = variables.domain
             self._variables["ttl"] = variables.ttl
+            # Update descriptions if present
+            if variables._descriptions:
+                self._variables["_descriptions"].update(variables._descriptions)
             # Update custom variables
             if variables.custom_vars:
                 self._variables["custom_vars"] = variables.custom_vars
