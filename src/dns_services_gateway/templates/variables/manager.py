@@ -24,6 +24,7 @@ class VariableManager:
             "domain": "",
             "ttl": 3600,
             "descriptions": {"domain": "Domain name", "ttl": "Default TTL"},
+            "custom_vars": {},
         }
 
         # Update with provided variables
@@ -43,18 +44,28 @@ class VariableManager:
                         self._variables["descriptions"].update(desc_val)
                 # Update custom variables
                 if "custom_vars" in variables:
-                    self._variables["custom_vars"] = variables["custom_vars"]
+                    if isinstance(variables["custom_vars"], dict):
+                        self._variables["custom_vars"] = variables["custom_vars"]
+                    else:
+                        # If custom_vars is not a dict, try to convert it
+                        try:
+                            self._variables["custom_vars"] = dict(
+                                variables["custom_vars"]
+                            )
+                        except (TypeError, ValueError):
+                            self._variables["custom_vars"] = {}
                 else:
                     # Add other variables as custom vars
-                    self._variables["custom_vars"] = {}
                     for name, value in variables.items():
-                        if name not in ["domain", "ttl", "descriptions"]:
-                            if isinstance(value, dict) and "value" in value:
+                        if name not in ["domain", "ttl", "descriptions", "custom_vars"]:
+                            if isinstance(value, dict):
                                 self._variables["custom_vars"][name] = value
                             else:
                                 self._variables["custom_vars"][name] = {
                                     "value": value,
-                                    "description": "",
+                                    "description": self._variables["descriptions"].get(
+                                        name, ""
+                                    ),
                                 }
 
     @property

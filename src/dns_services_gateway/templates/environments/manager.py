@@ -442,14 +442,21 @@ class EnvironmentManager:
             # Apply records if present
             if env.records:
                 for record_type, records in env.records.items():
-                    for record in records:
-                        if not isinstance(record, dict):
-                            return {
-                                "success": False,
-                                "errors": [f"Invalid record type for {record_type}"],
-                            }
+                    for record_data in records:
+                        # Convert dict to RecordModel if needed
+                        if isinstance(record_data, dict):
+                            record_data["type"] = record_type
+                            record = RecordModel(**record_data)
+                        else:
+                            record = record_data
+
+                        # Add record to manager
+                        errors = self.record_manager.add_record("default", record)
+                        if errors:
+                            return {"success": False, "errors": errors}
 
             return {"success": True, "errors": []}
+
         except Exception as e:
             return {"success": False, "errors": [str(e)]}
 

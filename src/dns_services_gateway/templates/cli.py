@@ -652,18 +652,34 @@ def list_variables(template_file: str):
         if not template_data.variables:
             click.echo("No variables found.")
             return
+
+        # Convert to VariableManager if needed
         if not isinstance(template_data.variables, VariableManager):
             template_data.variables = VariableManager(template_data.variables)
-        variables = template_data.variables.get_variables(flatten_custom_vars=False)
+
+        # Get variables in a consistent format
+        variables = template_data.variables.get_variables(flatten_custom_vars=True)
         if not variables:
             click.echo("No variables found.")
             return
+
+        # Create table for display
         table = Table(title="Template Variables")
         table.add_column("Name")
         table.add_column("Value")
         table.add_column("Description")
-        for var in variables:
-            table.add_row(str(var.name), str(var.value), str(var.description))
+
+        # Add rows for each variable
+        for name, var in variables.items():
+            if isinstance(var, SingleVariableModel):
+                table.add_row(str(name), str(var.value), str(var.description))
+            elif isinstance(var, dict):
+                value = var.get("value", "")
+                description = var.get("description", "")
+                table.add_row(str(name), str(value), str(description))
+            else:
+                table.add_row(str(name), str(var), "")
+
         console.print(table)
     except Exception as e:
         click.echo(f"Error: {str(e)}", err=True)

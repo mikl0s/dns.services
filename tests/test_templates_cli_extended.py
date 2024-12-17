@@ -140,18 +140,26 @@ def test_template_list(runner, example_template):
 
 
 @patch("dns_services_gateway.templates.environments.manager.EnvironmentManager")
-def test_template_apply(mock_env_manager, runner, example_template):
-    # Create a mock instance
-    mock_instance = mock_env_manager.return_value
+@patch("dns_services_gateway.templates.records.manager.RecordManager")
+def test_template_apply(
+    mock_record_manager, mock_env_manager, runner, example_template
+):
+    # Create mock instances
+    mock_env_instance = mock_env_manager.return_value
+    mock_record_instance = mock_record_manager.return_value
 
     # Mock the calculate_changes method to return some changes
-    mock_instance.calculate_changes.return_value = ([], [])  # (changes, errors)
+    mock_env_instance.calculate_changes.return_value = ([], [])  # (changes, errors)
 
     # Mock the add_environment method to return no errors
-    mock_instance.add_environment.return_value = []
+    mock_env_instance.add_environment.return_value = []
 
     # Mock the apply_changes method to return success
-    mock_instance.apply_changes.return_value = (True, [])  # (success, errors)
+    mock_env_instance.apply_changes.return_value = (True, [])  # (success, errors)
+
+    # Mock record manager methods
+    mock_record_instance.add_record.return_value = []  # No errors
+    mock_record_instance.validate_record.return_value = []  # No validation errors
 
     result = runner.invoke(
         template,
@@ -169,6 +177,9 @@ def test_template_apply(mock_env_manager, runner, example_template):
     print(f"Output: {result.output}")
     print(f"Exception: {result.exception}")
     assert result.exit_code == 0
+
+    # Verify record manager was called
+    mock_record_instance.add_record.assert_called()
 
 
 def test_template_validate(runner, example_template):

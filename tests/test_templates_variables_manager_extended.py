@@ -61,7 +61,7 @@ def test_variable_manager_initialization():
     manager = VariableManager()
     assert manager._variables["domain"] == ""
     assert manager._variables["ttl"] == 3600
-    assert "custom_vars" not in manager._variables
+    assert manager._variables["custom_vars"] == {}
 
     # Test initialization with dictionary
     manager = VariableManager(

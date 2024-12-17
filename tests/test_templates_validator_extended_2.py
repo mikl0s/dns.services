@@ -153,13 +153,21 @@ async def test_validate_record_name():
     valid_names = ["www", "api", "test-1", "sub.domain"]
     for name in valid_names:
         result = await validator.validate_record_name(name)
+        assert isinstance(
+            result, ValidationResult
+        ), f"Expected ValidationResult for {name}"
         assert result.is_valid, f"Expected {name} to be valid"
+        assert not result.errors, f"Expected no errors for {name}"
 
     # Test invalid names
     invalid_names = ["", " ", "invalid space", "invalid/char"]
     for name in invalid_names:
         result = await validator.validate_record_name(name)
+        assert isinstance(
+            result, ValidationResult
+        ), f"Expected ValidationResult for {name}"
         assert not result.is_valid, f"Expected {name} to be invalid"
+        assert result.errors, f"Expected errors for {name}"
 
 
 @pytest.mark.asyncio
@@ -195,24 +203,20 @@ async def test_validate_template(
     validator, sample_metadata, sample_variables, sample_records
 ):
     """Test complete template validation."""
-    # Convert variables to proper dictionary format
-    variables = {}
-    for var in sample_variables:
-        variables[var.name] = {
-            "value": var.value,
-            "description": var.description if hasattr(var, "description") else None,
-        }
+    # Create variables in the correct format
+    variables = {"domain": "example.com", "ttl": 3600, "custom_vars": {}}
 
-    # Ensure required variables exist
-    if "domain" not in variables:
-        variables["domain"] = {"value": "example.com", "description": "Domain name"}
-    if "ip" not in variables:
-        variables["ip"] = {"value": "192.0.2.1", "description": "IP address"}
+    # Add custom variables from sample_variables
+    for var in sample_variables:
+        if var.name not in ["domain", "ttl"]:
+            variables["custom_vars"][var.name] = {
+                "value": var.value,
+                "description": var.description if hasattr(var, "description") else "",
+            }
 
     result = await validator.validate_template(
         metadata=sample_metadata,
         variables=variables,
-        environments={},
         records=sample_records,
     )
     assert result.is_valid, f"Template validation failed with errors: {result.errors}"

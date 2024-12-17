@@ -125,7 +125,10 @@ def test_load_template_with_variables(template_loader, tmp_path):
     variables:
       domain: example.com
       ttl: 3600
-      custom_var: test_value
+      custom_vars:
+        custom_var:
+          value: test_value
+          description: Test variable
     records:
       A:
         - name: "@"
@@ -134,10 +137,18 @@ def test_load_template_with_variables(template_loader, tmp_path):
     """
     )
     template = template_loader.load_template(template_path)
-    variables = template.variables.get_variables()
+
+    # Test non-flattened variables
+    variables = template.variables.get_variables(flatten_custom_vars=False)
     assert variables["domain"] == "example.com"
     assert variables["ttl"] == 3600
-    assert variables["custom_var"] == "test_value"
+    assert variables["custom_vars"]["custom_var"]["value"] == "test_value"
+
+    # Test flattened variables
+    flattened = template.variables.get_variables(flatten_custom_vars=True)
+    assert flattened["domain"] == "example.com"
+    assert flattened["ttl"] == 3600
+    assert flattened["custom_var"] == "test_value"
 
 
 def test_load_template_with_environments(template_loader, tmp_path):
