@@ -10,6 +10,7 @@ from dns_services_gateway.templates.models.base import (
     RecordModel,
     MetadataModel,
     ValidationResult,
+    VariableModel,
 )
 from dns_services_gateway.templates.core.validator import TemplateValidator
 from dns_services_gateway.exceptions import ValidationError
@@ -203,12 +204,16 @@ async def test_validate_template(
 ):
     """Test complete template validation."""
     # Create variables in the correct format
-    variables = {"domain": "example.com", "ttl": 3600, "custom_vars": {}}
+    variables = VariableModel(
+        domain="example.com",
+        ttl=3600,
+        custom_vars={"ip": {"value": "192.0.2.1", "description": "IP address"}},
+    )
 
     # Add custom variables from sample_variables
     for var in sample_variables:
         if var.name not in ["domain", "ttl"]:  # Skip base variables
-            variables["custom_vars"][var.name] = {
+            variables.custom_vars[var.name] = {
                 "value": var.value,
                 "description": var.description,
             }
@@ -216,15 +221,31 @@ async def test_validate_template(
     # Convert sample_records to dict format
     records = {}
     for record_type, records_list in sample_records.items():
-        records[record_type] = [record.model_dump() for record in records_list]
+        records[record_type] = [
+            (
+                r.model_dump()
+                if hasattr(r, "model_dump")
+                else r.dict() if hasattr(r, "dict") else r
+            )
+            for r in records_list
+        ]
 
-    template = {
-        "metadata": sample_metadata.model_dump(),
-        "variables": variables,
+    # Update validator's template_data
+    validator.template_data = {
+        "metadata": (
+            sample_metadata.model_dump()
+            if hasattr(sample_metadata, "model_dump")
+            else (
+                sample_metadata.dict()
+                if hasattr(sample_metadata, "dict")
+                else sample_metadata
+            )
+        ),
+        "variables": variables.model_dump(),
         "records": records,
     }
 
-    result = await validator.validate_template(template)
+    result = await validator.validate_template()
     assert result.is_valid, f"Template validation failed with errors: {result.errors}"
 
 
