@@ -25,6 +25,7 @@ def basic_template_data() -> Dict[str, Any]:
             "ttl": 3600,
             "nameservers": ["ns1.example.com", "ns2.example.com"],
             "custom_vars": {},
+            "ip": "192.0.2.0",  # Add default IP
         },
         "environments": {},
         "records": {"A": [], "AAAA": [], "CNAME": [], "MX": [], "TXT": []},
@@ -44,13 +45,14 @@ async def test_validate_template_missing_required_variables(basic_template_data)
     """Test validation with missing required variables."""
     data = basic_template_data.copy()
     data["variables"] = {
-        "domain": "example.com",
-        # Missing ttl and nameservers
+        "ttl": 3600,
+        "nameservers": ["ns1.example.com", "ns2.example.com"],
+        "custom_vars": {},
     }
     validator = TemplateValidator(template_data=data)
     result = await validator.validate_template()
     assert not result.is_valid
-    assert any("Field required" in error for error in result.errors)
+    assert any("Missing required variable: domain" in error for error in result.errors)
 
 
 @pytest.mark.asyncio
@@ -59,12 +61,22 @@ async def test_validate_template_duplicate_environment(basic_template_data):
     data = basic_template_data.copy()
     data["environments"] = {
         "prod": {"name": "production", "variables": {"ttl": 3600}},
-        "staging": {"name": "production", "variables": {"ttl": 1800}},  # Duplicate name
     }
+    # Add duplicate environment through update to simulate duplicate definition
+    data["environments"].update(
+        {
+            "staging": {
+                "name": "production",
+                "variables": {"ttl": 1800},
+            },  # Duplicate name
+        }
+    )
     validator = TemplateValidator(template_data=data)
     result = await validator.validate_template()
     assert not result.is_valid
-    assert any("Duplicate environment name" in error for error in result.errors)
+    assert any(
+        "Duplicate environment name: production" in error for error in result.errors
+    )
 
 
 @pytest.mark.asyncio
@@ -160,6 +172,7 @@ async def test_validate_cname_conflicts(basic_template_data):
 async def test_validate_template_complex(basic_template_data):
     """Test complex template validation with multiple environments and records."""
     data = basic_template_data.copy()
+    data["variables"]["ip"] = "192.0.2.0"  # Add default IP
     data.update(
         {
             "environments": {
@@ -197,13 +210,15 @@ async def test_validate_template_complex(basic_template_data):
 async def test_validate_template_with_invalid_records(basic_template_data):
     """Test template validation with invalid records."""
     data = basic_template_data.copy()
+    data["variables"]["ip_web"] = "203.0.113.10"
+    data["variables"]["domain"] = "example.com"
     data["records"] = {
         "A": [
             {
                 "name": "www",
                 "type": "A",
                 "ttl": "${ttl}",
-                "value": "invalid-ip",  # Invalid IP address
+                "value": "invalid.ip",  # Invalid IP address format
             }
         ],
         "CNAME": [
@@ -211,14 +226,15 @@ async def test_validate_template_with_invalid_records(basic_template_data):
                 "name": "app",
                 "type": "CNAME",
                 "ttl": "${ttl}",
-                "value": "-invalid-hostname-",  # Invalid hostname
+                "value": "-invalid-hostname-",  # Invalid hostname format
             }
         ],
     }
     validator = TemplateValidator(template_data=data)
     result = await validator.validate_template()
     assert not result.is_valid
-    assert any("Invalid IP address" in error for error in result.errors)
+    assert any("Invalid IPv4 address" in error for error in result.errors)
+    assert any("Invalid hostname in CNAME record" in error for error in result.errors)
 
 
 @pytest.mark.asyncio

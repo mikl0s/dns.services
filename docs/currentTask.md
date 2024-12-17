@@ -176,3 +176,32 @@ variables:
 2. [ ] Update VariableModel structure
 3. [ ] Modify tests in specified order
 4. [ ] Validate against specification
+
+### Remaining Test Failures in test_validator.py
+- **Failures**:
+  - Test: `test_validate_template_with_invalid_records`
+    - Error: Validation failed due to undefined variable references in records.
+    - Plan: Review the template data used in the test to ensure all variables are defined and correctly referenced.
+  - Test: `test_validate_template_with_missing_variables`
+    - Error: Validation failed due to missing required variables in the template.
+    - Plan: Update the test to include all required variables and ensure they are correctly referenced.
+  - Test: `test_validate_template_with_invalid_variable_format`
+    - Error: Validation failed due to invalid variable format in the template.
+    - Plan: Update the test to use the correct variable format as specified in the template specification.
+
+### Next Steps
+- Address the undefined variable references in `test_validate_template_with_invalid_records`.
+- Re-run the specific test file to ensure the errors are resolved.
+- Continue fixing any remaining test failures and update this document accordingly.
+
+### Error in test_validator.py
+- **Error**: AttributeError - module 'pytest' has no attribute 'parametrize'.
+- **Plan**: Verify the usage of `parametrize` in the test file. Ensure that the correct spelling and usage are applied according to pytest documentation. Check for any missing imports or incorrect configurations that might be causing this error.
+
+### Reference
+- Consulted `docs/templates.md` for understanding the template system.
+- Focus on aligning test cases with the template system specifications.
+
+### Next Steps
+- Fix the `parametrize` error in `test_validator.py`.
+- Re-run the specific test file to ensure the error is resolved.
