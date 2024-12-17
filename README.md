@@ -8,18 +8,20 @@
 
 > **Built with [Windsurf](https://www.codeium.com/windsurf)**
 >
-> This entire production-ready module was created in just a couple of evenings using Windsurf Editor. From initial planning to comprehensive testing, Windsurf's AI-powered capabilities enabled rapid development while maintaining exceptional code quality:
+> This entire production-ready module was created in just two weeks during the evenings using Windsurf Editor. From initial planning to comprehensive testing, Windsurf's AI-powered capabilities enabled rapid development while maintaining exceptional code quality:
 >
-> - **>80% test coverage**
+> - **>70% test coverage**
 > - **Full type safety**
 > - **Async-first architecture**
 > - **Production-ready error handling**
 >
-> It was fun learning Windsurf, and I'm excited to share the results with the community.
+> It was fun learning/using Windsurf, and I'm excited to share the results with the community.
 
 ## Description
 
 **<ins>No affiliation with DNS.services, made by users of DNS.services</ins>**
+
+Although no affiliation with DNS.services, I did present the module to them for approval before making it available.
 
 A Python client library and CLI tool for managing Domains and DNS records through the DNS.services API. This tool provides a simple and intuitive interface for managing domains and DNS records programmatically or via command line, single entry, batch entries or use our template system.
 
