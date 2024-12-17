@@ -158,11 +158,13 @@ def test_template_apply(
     mock_env_instance.apply_changes.return_value = (True, [])  # (success, errors)
 
     # Mock record manager methods with proper async support
-    async def mock_add_record(record):
-        return []
+    async def mock_add_record(group_name, record):
+        return True, []  # Return (success, errors)
+
     async def mock_validate_record(record):
-        return []
-    
+        return True, []  # Return (success, errors)
+
+    # Set up the mock methods on the instance
     mock_record_instance.add_record = Mock(side_effect=mock_add_record)
     mock_record_instance.validate_record = Mock(side_effect=mock_validate_record)
 
@@ -179,7 +181,7 @@ def test_template_apply(
             "force",
         ],
     )
-    
+
     assert result.exit_code == 0, f"Command failed with output: {result.output}"
 
 

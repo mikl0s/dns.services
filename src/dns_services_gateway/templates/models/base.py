@@ -259,17 +259,17 @@ class ValidationResult:
         """
         return self._is_valid and not self.errors
 
-    def add_error(self, error: str) -> None:
+    def add_error(self, error: str):
         """Add validation error.
 
         Args:
             error: Error message to add
         """
+        self._is_valid = False
         if error not in self.errors:  # Avoid duplicate error messages
             self.errors.append(error)
-            self._is_valid = False
 
-    def merge(self, other: "ValidationResult") -> None:
+    def merge(self, other: "ValidationResult"):
         """Merge another validation result into this one.
 
         Args:
@@ -295,8 +295,11 @@ class ValidationResult:
         Returns:
             Generator that yields self
         """
-        yield self
-        return self
+
+        async def _await():
+            return self
+
+        return _await().__await__()
 
 
 class EnvironmentModel(BaseModel):

@@ -340,7 +340,7 @@ class EnvironmentManager:
             # Apply each change
             for change in changes:
                 if change.type == ChangeType.CREATE:
-                    result = record_manager.add_record(change.record)
+                    result = record_manager.add_record("default", change.record)
                     if isinstance(result, list):
                         errors.extend(result)
                     elif not result:

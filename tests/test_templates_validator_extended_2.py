@@ -9,6 +9,7 @@ from dns_services_gateway.templates.models.base import (
     SingleVariableModel,
     RecordModel,
     MetadataModel,
+    ValidationResult,
 )
 from dns_services_gateway.templates.core.validator import TemplateValidator
 from dns_services_gateway.exceptions import ValidationError
@@ -151,7 +152,9 @@ async def test_validate_record_name(validator):
     valid_names = ["www", "api", "test-1", "sub.domain"]
     for name in valid_names:
         result = await validator.validate_record_name(name)
-        assert isinstance(result, ValidationResult), f"Expected ValidationResult for {name}"
+        assert isinstance(
+            result, ValidationResult
+        ), f"Expected ValidationResult for {name}"
         assert result.is_valid, f"Expected {name} to be valid"
         assert not result.errors, f"Expected no errors for {name}"
 
@@ -159,7 +162,9 @@ async def test_validate_record_name(validator):
     invalid_names = ["", " ", "invalid space", "invalid/char"]
     for name in invalid_names:
         result = await validator.validate_record_name(name)
-        assert isinstance(result, ValidationResult), f"Expected ValidationResult for {name}"
+        assert isinstance(
+            result, ValidationResult
+        ), f"Expected ValidationResult for {name}"
         assert not result.is_valid, f"Expected {name} to be invalid"
         assert result.errors, f"Expected errors for {name}"
 
@@ -202,16 +207,21 @@ async def test_validate_template(
 
     # Add custom variables from sample_variables
     for var in sample_variables:
-        if hasattr(var, "name") and hasattr(var, "value"):
+        if var.name not in ["domain", "ttl"]:  # Skip base variables
             variables["custom_vars"][var.name] = {
                 "value": var.value,
-                "description": var.description if hasattr(var, "description") else "",
+                "description": var.description,
             }
 
+    # Convert sample_records to dict format
+    records = {}
+    for record_type, records_list in sample_records.items():
+        records[record_type] = [record.model_dump() for record in records_list]
+
     template = {
-        "metadata": sample_metadata,
+        "metadata": sample_metadata.model_dump(),
         "variables": variables,
-        "records": sample_records,
+        "records": records,
     }
 
     result = await validator.validate_template(template)
