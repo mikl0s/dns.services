@@ -1,6 +1,6 @@
 # DNS Services Gateway Enhancement Plan
 
-Current Version: v0.8.8 | Python Version: 3.12.3+
+Current Version: v0.9.4 | Python Version: 3.12.3+
 
 ## Core Functionality Enhancements
 
@@ -335,7 +335,7 @@ Current Version: v0.8.8 | Python Version: 3.12.3+
   - [ ] Add API rate limiting
   - [ ] Support API batching
   - [ ] Handle API timeouts
-  - [x] Monitor API performance
+  - [ ] Monitor API performance
 
 ## Development Environment
 
