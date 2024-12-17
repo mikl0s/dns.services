@@ -53,24 +53,18 @@ async def test_validate_template_missing_required_variables(basic_template_data)
     result = await validator.validate_template()
     assert not result.is_valid
     assert any("Missing required variable: domain" in error for error in result.errors)
+    assert any("Missing required variable: ip" in error for error in result.errors)
 
 
 @pytest.mark.asyncio
 async def test_validate_template_duplicate_environment(basic_template_data):
     """Test validation with duplicate environment."""
     data = basic_template_data.copy()
+    # Create environments with duplicate names
     data["environments"] = {
         "prod": {"name": "production", "variables": {"ttl": 3600}},
+        "staging": {"name": "production", "variables": {"ttl": 1800}},  # Duplicate name
     }
-    # Add duplicate environment through update to simulate duplicate definition
-    data["environments"].update(
-        {
-            "staging": {
-                "name": "production",
-                "variables": {"ttl": 1800},
-            },  # Duplicate name
-        }
-    )
     validator = TemplateValidator(template_data=data)
     result = await validator.validate_template()
     assert not result.is_valid

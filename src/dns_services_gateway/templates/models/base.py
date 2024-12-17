@@ -261,8 +261,9 @@ class ValidationResult:
         Args:
             error: Error message to add
         """
-        self.errors.append(error)
-        self._is_valid = False
+        if error not in self.errors:  # Avoid duplicate error messages
+            self.errors.append(error)
+            self._is_valid = False
 
     def merge(self, other: "ValidationResult") -> None:
         """Merge another validation result into this one.
@@ -272,7 +273,9 @@ class ValidationResult:
         """
         if not other.is_valid:
             self._is_valid = False
-            self.errors.extend(other.errors)
+            for error in other.errors:
+                if error not in self.errors:  # Avoid duplicate error messages
+                    self.errors.append(error)
 
     def __bool__(self) -> bool:
         """Return validation status.
@@ -288,7 +291,7 @@ class ValidationResult:
         Returns:
             Generator that yields self
         """
-        yield
+        yield self
         return self
 
 

@@ -65,27 +65,26 @@ class TemplateValidator:
 
             # Validate metadata
             metadata_result = await self.validate_metadata(metadata)
-            if not metadata_result.is_valid:
-                result.merge(metadata_result)
-                return result
+            result.merge(metadata_result)
 
             # Validate variables and store them for reference validation
             variables_result = await self.validate_variables(variables)
-            if not variables_result.is_valid:
-                result.merge(variables_result)
-                return result
+            result.merge(variables_result)
+
+            # Check for required variables
+            template_vars = self.template_data.get("variables", {})
+            if "domain" not in template_vars:
+                result.add_error("Missing required variable: domain")
+            if "ip" not in template_vars:
+                result.add_error("Missing required variable: ip")
 
             # Validate environments
-            environments_result = await self.validate_environments()
-            if not environments_result.is_valid:
-                result.merge(environments_result)
-                return result
+            env_result = await self.validate_environments()
+            result.merge(env_result)
 
             # Validate records
             records_result = await self._validate_records(records)
-            if not records_result.is_valid:
-                result.merge(records_result)
-                return result
+            result.merge(records_result)
 
             # Validate variable references
             refs_result = await self.validate_variable_references()
@@ -421,17 +420,18 @@ class TemplateValidator:
             result.add_error("Environments must be a dictionary")
             return result
 
-        seen_envs = set()
+        seen_env_names = set()
         for env_name, env_data in environments.items():
             try:
-                # Check for duplicate environment keys
-                if env_name in seen_envs:
-                    result.add_error(f"Found duplicate environment: {env_name}")
-                seen_envs.add(env_name)
+                # Check for duplicate environment names
+                env_display_name = env_data.get("name", env_name)
+                if env_display_name in seen_env_names:
+                    result.add_error(f"Duplicate environment name: {env_display_name}")
+                seen_env_names.add(env_display_name)
 
                 # Create a copy of env_data to avoid modifying the original
                 env_dict = dict(env_data)
-                env_dict["name"] = env_dict.get("name", env_name)
+                env_dict["name"] = env_display_name
 
                 env_model = EnvironmentModel(**env_dict)
 
@@ -462,7 +462,7 @@ class TemplateValidator:
                                         )
 
             except Exception as e:
-                result.add_error(f"Invalid environment '{env_name}': {str(e)}")
+                result.add_error(f"Invalid environment {env_name}: {str(e)}")
 
         return result
 

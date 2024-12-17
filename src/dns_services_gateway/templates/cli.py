@@ -367,9 +367,19 @@ def apply(
         loader = TemplateLoader(Path(template_file))
         template_data = loader.load()
 
+        # Initialize environment manager with variables
+        variables = {}
+        if template_data.variables:
+            if hasattr(template_data.variables, "get_variables"):
+                variables = template_data.variables.get_variables()
+            elif isinstance(template_data.variables, dict):
+                variables = template_data.variables
+            else:
+                variables = template_data.variables.model_dump()
+
         # Initialize environment manager
         env_manager = EnvironmentManager(
-            base_variables=template_data.variables if template_data.variables else {},
+            base_variables=variables,
             base_records=template_data.records if template_data.records else {},
         )
 
@@ -508,20 +518,20 @@ def set_variable(template_file: str, key_value: str, description: Optional[str] 
 
         # Initialize variables if needed
         if not template_data.variables:
-            template_data.variables = {}
+            template_data.variables = VariableManager()
 
         # Handle built-in variables and validation
         try:
             validated_value = _validate_variable_value(key, value)
-            var_manager = VariableManager(template_data.variables)
-            var_manager.set_variable(
-                {
-                    "name": key,
-                    "value": validated_value,
-                    "description": description or "",
-                }
+            if not isinstance(template_data.variables, VariableManager):
+                template_data.variables = VariableManager(template_data.variables)
+            template_data.variables.set_variable(
+                SingleVariableModel(
+                    name=key,
+                    value=validated_value,
+                    description=description or "",
+                )
             )
-            template_data.variables = var_manager.variables
         except Exception as e:
             click.echo(f"Failed to set variable: {str(e)}", err=True)
             sys.exit(1)
@@ -554,11 +564,12 @@ def get_variable(template_file: str, key: str):
             click.echo(f"Variable {key} not found", err=True)
             sys.exit(1)
 
-        var_manager = VariableManager(template_data.variables)
-        try:
-            variable = var_manager.get_variable(key)
-            click.echo(json.dumps(variable, indent=2))
-        except KeyError:
+        if not isinstance(template_data.variables, VariableManager):
+            template_data.variables = VariableManager(template_data.variables)
+        variable = template_data.variables.get_variable(key)
+        if variable:
+            click.echo(f"{variable.name}={variable.value}")
+        else:
             click.echo(f"Variable {key} not found", err=True)
             sys.exit(1)
     except Exception as e:
@@ -580,10 +591,10 @@ def remove_variable(template_file: str, key: str):
             click.echo(f"Variable {key} not found", err=True)
             sys.exit(1)
 
-        var_manager = VariableManager(template_data.variables)
+        if not isinstance(template_data.variables, VariableManager):
+            template_data.variables = VariableManager(template_data.variables)
         try:
-            var_manager.remove_variable(key)
-            template_data.variables = var_manager.variables
+            template_data.variables.remove_variable(key)
 
             # Save template
             with open(template_file, "w") as f:
@@ -604,8 +615,12 @@ def list_variables(template_file: str):
     try:
         loader = TemplateLoader(Path(template_file))
         template_data = loader.load()
-        var_manager = VariableManager(template_data.variables)
-        variables = var_manager.get_all_variables()
+        if not template_data.variables:
+            click.echo("No variables found.")
+            return
+        if not isinstance(template_data.variables, VariableManager):
+            template_data.variables = VariableManager(template_data.variables)
+        variables = template_data.variables.get_all_variables()
         if not variables:
             click.echo("No variables found.")
             return

@@ -74,6 +74,66 @@
 5. Complete CAA/NS/SOA record validation
 6. Update tests to verify fixes
 
+# Template CLI Test Failures Analysis
+
+## Current Failures in test_templates_cli_extended.py
+
+### 1. test_template_apply
+- **Error**: Exit code 1 instead of expected 0
+- **Context**: Template application command failing
+- **Cause**: Based on template documentation, likely an issue with the variable structure in the template file
+
+### 2. test_template_set_variable
+- **Error**: Failed to set variable - 'VariableManager' object has no attribute 'variables'
+- **Context**: Variable management command failing
+- **Cause**: VariableManager implementation doesn't match the template specification structure
+
+### 3. test_template_get_variable
+- **Error**: Exit code 1 instead of expected 0
+- **Context**: Variable retrieval command failing
+- **Cause**: Related to the missing 'variables' attribute in VariableManager
+
+### 4. test_template_remove_variable
+- **Error**: 'VariableManager' object has no attribute 'remove_variable'
+- **Context**: Variable removal command failing
+- **Cause**: Missing implementation of remove_variable method
+
+## Fix Plan
+
+1. Update VariableManager Implementation
+   - Implement variables attribute according to template spec
+   - Add proper variable management methods (set, get, remove)
+   - Follow the variable structure from docs/templates.md:
+   ```yaml
+   variables:
+     domain: "example.com"
+     ttl: 3600
+     custom_vars:
+       key:
+         value: "value"
+         description: "description"
+   ```
+
+2. Fix CLI Commands
+   - Update template apply command to handle new variable structure
+   - Implement proper error handling for variable operations
+   - Add validation for variable operations
+
+3. Update Test Data
+   - Ensure test templates follow the correct variable structure
+   - Add proper test cases for variable management
+   - Include validation tests for variable operations
+
+4. Implementation Steps
+   - Start with VariableManager class fixes
+   - Add missing methods and attributes
+   - Update CLI command handlers
+   - Fix test data and assertions
+
+## References
+- Template specification from docs/templates.md defines the correct variable structure
+- CLI commands section in docs/templates.md outlines expected behavior
+
 # Current Task: Align Template Tests with Specification
 
 ## Analysis of Test Suite Dependencies
@@ -176,6 +236,52 @@ variables:
 2. [ ] Update VariableModel structure
 3. [ ] Modify tests in specified order
 4. [ ] Validate against specification
+
+## Variable Manager Implementation Analysis
+
+After reviewing the VariableManager implementation, here are the specific issues and fixes needed:
+
+1. Method Name Mismatches:
+   - CLI expects `variables` attribute, but class uses `_variables`
+   - CLI expects `remove_variable`, but class has `delete_variable`
+   - CLI expects direct variable access, but class uses getter methods
+
+2. Required Changes:
+
+```python
+class VariableManager:
+    @property
+    def variables(self):
+        """Property to access variables directly as expected by CLI."""
+        return self._variables
+
+    def remove_variable(self, name: str) -> None:
+        """Alias for delete_variable to match CLI expectations."""
+        return self.delete_variable(name)
+```
+
+3. CLI Command Fixes:
+   - Update template apply command to use get_variables() instead of direct access
+   - Fix variable set command to use set_variable() properly
+   - Update get_variable command to handle both built-in and custom variables
+   - Fix remove_variable command to use the new alias
+
+4. Implementation Steps:
+   - Add variables property to VariableManager
+   - Add remove_variable alias method
+   - Update CLI commands to use proper method calls
+   - Fix test data to match expected structure
+
+5. Test Data Updates:
+   - Ensure example_template fixture has correct variable structure
+   - Update test assertions to match new implementation
+   - Add test cases for both built-in and custom variables
+
+## Next Actions
+1. Implement VariableManager changes
+2. Update CLI command handlers
+3. Fix test data
+4. Run specific test file to verify fixes
 
 ### Remaining Test Failures in test_validator.py
 - **Failures**:

@@ -52,6 +52,11 @@ class VariableManager:
                                     "description": "",
                                 }
 
+    @property
+    def variables(self) -> Dict[str, Any]:
+        """Direct access to variables for CLI compatibility."""
+        return self._variables
+
     def get_variables(self) -> Dict[str, Any]:
         """Get all variables."""
         result = {
@@ -143,6 +148,14 @@ class VariableManager:
             del self._variables["custom_vars"][name]
         else:
             raise KeyError(f"Variable {name} not found")
+
+    def remove_variable(self, name: str) -> None:
+        """Alias for delete_variable to match CLI expectations.
+
+        Args:
+            name: Variable name to remove
+        """
+        return self.delete_variable(name)
 
     def get_all_variables(self) -> List[SingleVariableModel]:
         """Get all variables.
