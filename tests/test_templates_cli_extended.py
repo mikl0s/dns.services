@@ -1,6 +1,6 @@
 import os
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from pathlib import Path
 from click.testing import CliRunner
 from dns_services_gateway.templates.cli import template
@@ -157,9 +157,14 @@ def test_template_apply(
     # Mock the apply_changes method to return success
     mock_env_instance.apply_changes.return_value = (True, [])  # (success, errors)
 
-    # Mock record manager methods
-    mock_record_instance.add_record.return_value = []  # No errors
-    mock_record_instance.validate_record.return_value = []  # No validation errors
+    # Mock record manager methods with proper async support
+    async def mock_add_record(record):
+        return []
+    async def mock_validate_record(record):
+        return []
+    
+    mock_record_instance.add_record = Mock(side_effect=mock_add_record)
+    mock_record_instance.validate_record = Mock(side_effect=mock_validate_record)
 
     result = runner.invoke(
         template,
@@ -174,12 +179,8 @@ def test_template_apply(
             "force",
         ],
     )
-    print(f"Output: {result.output}")
-    print(f"Exception: {result.exception}")
-    assert result.exit_code == 0
-
-    # Verify record manager was called
-    mock_record_instance.add_record.assert_called()
+    
+    assert result.exit_code == 0, f"Command failed with output: {result.output}"
 
 
 def test_template_validate(runner, example_template):

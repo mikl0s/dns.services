@@ -149,10 +149,15 @@ def test_validate_environment(environment_manager):
     assert len(errors) == 0
 
 
-def test_apply_environment(environment_manager):
-    result = environment_manager.apply_environment("production")
-    assert result["success"] is True
-    assert not result["errors"]
+async def test_apply_environment(environment_manager):
+    # Calculate changes first
+    changes, errors = await environment_manager.calculate_changes("production")
+    assert not errors, f"Unexpected errors during change calculation: {errors}"
+
+    # Apply the changes
+    success, errors = await environment_manager.apply_changes(changes)
+    assert success, f"Failed to apply changes: {errors}"
+    assert not errors, f"Unexpected errors during apply: {errors}"
 
 
 def test_export_environment(environment_manager):

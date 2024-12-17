@@ -145,17 +145,13 @@ async def test_validate_records_invalid_type(validator, sample_records):
 
 
 @pytest.mark.asyncio
-async def test_validate_record_name():
+async def test_validate_record_name(validator):
     """Test record name validation."""
-    validator = TemplateValidator()
-
     # Test valid names
     valid_names = ["www", "api", "test-1", "sub.domain"]
     for name in valid_names:
         result = await validator.validate_record_name(name)
-        assert isinstance(
-            result, ValidationResult
-        ), f"Expected ValidationResult for {name}"
+        assert isinstance(result, ValidationResult), f"Expected ValidationResult for {name}"
         assert result.is_valid, f"Expected {name} to be valid"
         assert not result.errors, f"Expected no errors for {name}"
 
@@ -163,9 +159,7 @@ async def test_validate_record_name():
     invalid_names = ["", " ", "invalid space", "invalid/char"]
     for name in invalid_names:
         result = await validator.validate_record_name(name)
-        assert isinstance(
-            result, ValidationResult
-        ), f"Expected ValidationResult for {name}"
+        assert isinstance(result, ValidationResult), f"Expected ValidationResult for {name}"
         assert not result.is_valid, f"Expected {name} to be invalid"
         assert result.errors, f"Expected errors for {name}"
 
@@ -208,17 +202,19 @@ async def test_validate_template(
 
     # Add custom variables from sample_variables
     for var in sample_variables:
-        if var.name not in ["domain", "ttl"]:
+        if hasattr(var, "name") and hasattr(var, "value"):
             variables["custom_vars"][var.name] = {
                 "value": var.value,
                 "description": var.description if hasattr(var, "description") else "",
             }
 
-    result = await validator.validate_template(
-        metadata=sample_metadata,
-        variables=variables,
-        records=sample_records,
-    )
+    template = {
+        "metadata": sample_metadata,
+        "variables": variables,
+        "records": sample_records,
+    }
+
+    result = await validator.validate_template(template)
     assert result.is_valid, f"Template validation failed with errors: {result.errors}"
 
 
