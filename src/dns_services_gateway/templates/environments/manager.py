@@ -55,7 +55,7 @@ class EnvironmentManager:
         if isinstance(base_variables, dict):
             base_vars = base_variables
         elif hasattr(base_variables, "get_variables"):
-            base_vars = base_variables.get_variables()
+            base_vars = base_variables.get_variables(flatten_custom_vars=True)
         else:
             base_vars = {}
             if hasattr(base_variables, "model_dump"):

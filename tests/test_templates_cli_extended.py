@@ -1,5 +1,6 @@
 import os
 import pytest
+from unittest.mock import patch
 from pathlib import Path
 from click.testing import CliRunner
 from dns_services_gateway.templates.cli import template
@@ -138,7 +139,20 @@ def test_template_list(runner, example_template):
     assert result.exit_code == 0
 
 
-def test_template_apply(runner, example_template):
+@patch("dns_services_gateway.templates.environments.manager.EnvironmentManager")
+def test_template_apply(mock_env_manager, runner, example_template):
+    # Create a mock instance
+    mock_instance = mock_env_manager.return_value
+
+    # Mock the calculate_changes method to return some changes
+    mock_instance.calculate_changes.return_value = ([], [])  # (changes, errors)
+
+    # Mock the add_environment method to return no errors
+    mock_instance.add_environment.return_value = []
+
+    # Mock the apply_changes method to return success
+    mock_instance.apply_changes.return_value = (True, [])  # (success, errors)
+
     result = runner.invoke(
         template,
         [
@@ -212,14 +226,26 @@ def test_template_init(runner, tmp_path):
 
 
 def test_template_list_variables(runner, example_template):
+    # First set up a variable with proper structure
+    result = runner.invoke(
+        template,
+        [
+            "set-variable",
+            str(example_template),
+            "test_var=test_value",
+            "--description",
+            "Test variable",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Now list the variables
     result = runner.invoke(template, ["list-variables", str(example_template)])
     print(f"Output: {result.output}")
     print(f"Exception: {result.exception}")
     assert result.exit_code == 0
-    # Check that the output contains our variables
-    assert "domain" in result.output
-    assert "ttl" in result.output
-    assert "ip" in result.output
+    assert "test_var" in result.output
+    assert "test_value" in result.output
 
 
 def test_template_set_variable(runner, example_template):

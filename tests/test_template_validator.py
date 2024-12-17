@@ -11,6 +11,8 @@ def basic_variables():
         "domain": "example.com",
         "ttl": 3600,
         "nameservers": ["ns1.example.com", "ns2.example.com"],
+        "ip": "192.168.1.1",
+        "hostname": "test",
     }
 
 
@@ -96,6 +98,8 @@ async def test_validate_template_missing_variables(basic_environment, basic_reco
 @pytest.mark.asyncio
 async def test_validate_environment_duplicate(basic_variables, basic_environment):
     """Test validating duplicate environments."""
+    env_data = dict(basic_environment)
+    env_data["name"] = "production"
     template_data = {
         "metadata": {
             "name": "test-template",
@@ -105,8 +109,8 @@ async def test_validate_environment_duplicate(basic_variables, basic_environment
         },
         "variables": basic_variables,
         "environments": {
-            "prod": basic_environment,
-            "staging": basic_environment,
+            "prod": env_data,
+            "staging": env_data,
         },
     }
     validator = TemplateValidator(template_data=template_data)
@@ -180,7 +184,7 @@ async def test_validate_record_variable_reference(basic_variables, basic_environ
     records_with_refs = {
         "A": [
             {
-                "name": "${hostname}",
+                "name": "${undefined_var}",  # Using an undefined variable
                 "value": "{{variables.ip}}",
                 "ttl": 300,
                 "description": "Record with variable references",
@@ -202,7 +206,9 @@ async def test_validate_record_variable_reference(basic_variables, basic_environ
     validator = TemplateValidator(template_data=template_data)
     result = await validator.validate_template()
     assert not result.is_valid
-    assert any("undefined" in error.lower() for error in result.errors)
+    assert any(
+        "undefined variable reference" in error.lower() for error in result.errors
+    )
 
 
 def test_find_variable_references():

@@ -172,9 +172,8 @@ class TemplateValidator:
         base_vars = set()
         if isinstance(variables, dict):
             # Add root level variables
-            for key in ["domain", "ttl"]:
-                if key in variables:
-                    base_vars.add(key)
+            for key in variables:
+                base_vars.add(key)
 
             # Add custom variables
             custom_vars = variables.get("custom_vars", {})
@@ -189,32 +188,31 @@ class TemplateValidator:
         # Validate each variable
         if isinstance(variables, dict):
             # Validate root level variables
-            for name in ["domain", "ttl"]:
-                if name in variables:
-                    value = variables[name]
-                    if not isinstance(name, str):
-                        result.add_error(f"Variable name must be a string: {name}")
-                        continue
+            for name in variables:
+                value = variables[name]
+                if not isinstance(name, str):
+                    result.add_error(f"Variable name must be a string: {name}")
+                    continue
 
-                    if name == "":
-                        result.add_error("Variable name cannot be empty")
-                        continue
+                if name == "":
+                    result.add_error("Variable name cannot be empty")
+                    continue
 
-                    if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
-                        result.add_error(
-                            f"Invalid variable name '{name}'. Must start with a letter and contain only letters, numbers, and underscores"
-                        )
+                if not re.match(r"^[a-zA-Z][a-zA-Z0-9_]*$", name):
+                    result.add_error(
+                        f"Invalid variable name '{name}'. Must start with a letter and contain only letters, numbers, and underscores"
+                    )
 
-                    # Validate TTL values
-                    if name == "ttl":
-                        try:
-                            ttl = int(value)
-                            if ttl < 0:
-                                result.add_error("TTL must be non-negative")
-                            elif ttl > 2147483647:  # Max 32-bit signed int
-                                result.add_error("TTL value is too large")
-                        except (ValueError, TypeError):
-                            result.add_error("TTL must be a valid integer")
+                # Validate TTL values
+                if name == "ttl":
+                    try:
+                        ttl = int(value)
+                        if ttl < 0:
+                            result.add_error("TTL must be non-negative")
+                        elif ttl > 2147483647:  # Max 32-bit signed int
+                            result.add_error("TTL value is too large")
+                    except (ValueError, TypeError):
+                        result.add_error("TTL must be a valid integer")
 
             # Validate custom variables
             custom_vars = variables.get("custom_vars", {})
@@ -348,7 +346,7 @@ class TemplateValidator:
                     result.merge(value_result)
 
                     # Check variable references
-                    for field in ["value", "ttl"]:
+                    for field in ["name", "value", "ttl"]:
                         if field in record_dict:
                             value = str(record_dict[field])
                             refs = self.find_variable_references(value)
@@ -498,6 +496,11 @@ class TemplateValidator:
                 env_dict["name"] = env_display_name
 
                 env_model = EnvironmentModel(**env_dict)
+
+                # Add environment variables to the valid variables set
+                if "variables" in env_dict:
+                    for var_name in env_dict["variables"]:
+                        self.variables.add(var_name)
 
                 # Validate environment variables
                 if "variables" in env_dict:

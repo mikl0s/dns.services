@@ -82,7 +82,7 @@ def validate(template_file: str):
         errors = asyncio.run(
             validator.validate_template(
                 variables=(
-                    template_data.variables.get_variables()
+                    template_data.variables.get_variables(flatten_custom_vars=True)
                     if hasattr(template_data.variables, "get_variables")
                     else template_data.variables
                 ),
@@ -371,7 +371,9 @@ def apply(
         variables = {}
         if template_data.variables:
             if hasattr(template_data.variables, "get_variables"):
-                variables = template_data.variables.get_variables()
+                variables = template_data.variables.get_variables(
+                    flatten_custom_vars=True
+                )
             elif isinstance(template_data.variables, dict):
                 base_vars = {}
 
@@ -652,7 +654,7 @@ def list_variables(template_file: str):
             return
         if not isinstance(template_data.variables, VariableManager):
             template_data.variables = VariableManager(template_data.variables)
-        variables = template_data.variables.get_all_variables()
+        variables = template_data.variables.get_variables(flatten_custom_vars=False)
         if not variables:
             click.echo("No variables found.")
             return

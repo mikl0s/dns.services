@@ -148,15 +148,18 @@ async def test_validate_records_invalid_type(validator, sample_records):
 async def test_validate_record_name():
     """Test record name validation."""
     validator = TemplateValidator()
+
+    # Test valid names
     valid_names = ["www", "api", "test-1", "sub.domain"]
     for name in valid_names:
         result = await validator.validate_record_name(name)
-        assert result.is_valid is True
+        assert result.is_valid, f"Expected {name} to be valid"
 
+    # Test invalid names
     invalid_names = ["", " ", "invalid space", "invalid/char"]
     for name in invalid_names:
         result = await validator.validate_record_name(name)
-        assert result.is_valid is False
+        assert not result.is_valid, f"Expected {name} to be invalid"
 
 
 @pytest.mark.asyncio
@@ -192,14 +195,27 @@ async def test_validate_template(
     validator, sample_metadata, sample_variables, sample_records
 ):
     """Test complete template validation."""
+    # Convert variables to proper dictionary format
+    variables = {}
+    for var in sample_variables:
+        variables[var.name] = {
+            "value": var.value,
+            "description": var.description if hasattr(var, "description") else None,
+        }
+
+    # Ensure required variables exist
+    if "domain" not in variables:
+        variables["domain"] = {"value": "example.com", "description": "Domain name"}
+    if "ip" not in variables:
+        variables["ip"] = {"value": "192.0.2.1", "description": "IP address"}
+
     result = await validator.validate_template(
         metadata=sample_metadata,
-        variables=sample_variables,
+        variables=variables,
         environments={},
         records=sample_records,
     )
-    assert result.is_valid
-    assert not result.errors
+    assert result.is_valid, f"Template validation failed with errors: {result.errors}"
 
 
 @pytest.mark.asyncio

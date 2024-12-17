@@ -119,6 +119,10 @@ class VariableModel(BaseModel):
     custom_vars: Dict[str, Any] = Field(
         default_factory=dict, description="Custom variables"
     )
+    descriptions: Dict[str, str] = Field(
+        default_factory=lambda: {"domain": "Domain name", "ttl": "Default TTL"},
+        description="Variable descriptions",
+    )
 
     @field_validator("domain")
     @classmethod

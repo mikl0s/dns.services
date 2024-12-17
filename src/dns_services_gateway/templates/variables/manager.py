@@ -23,7 +23,7 @@ class VariableManager:
         self._variables = {
             "domain": "",
             "ttl": 3600,
-            "_descriptions": {"domain": "Domain name", "ttl": "Default TTL"},
+            "descriptions": {"domain": "Domain name", "ttl": "Default TTL"},
         }
 
         # Update with provided variables
@@ -37,10 +37,10 @@ class VariableManager:
                 if "ttl" in variables:
                     self._variables["ttl"] = variables["ttl"]
                 # Update descriptions if present
-                if "_descriptions" in variables:
-                    desc_val = variables["_descriptions"]
+                if "descriptions" in variables:
+                    desc_val = variables["descriptions"]
                     if isinstance(desc_val, dict):
-                        self._variables["_descriptions"].update(desc_val)
+                        self._variables["descriptions"].update(desc_val)
                 # Update custom variables
                 if "custom_vars" in variables:
                     self._variables["custom_vars"] = variables["custom_vars"]
@@ -48,7 +48,7 @@ class VariableManager:
                     # Add other variables as custom vars
                     self._variables["custom_vars"] = {}
                     for name, value in variables.items():
-                        if name not in ["domain", "ttl", "_descriptions"]:
+                        if name not in ["domain", "ttl", "descriptions"]:
                             if isinstance(value, dict) and "value" in value:
                                 self._variables["custom_vars"][name] = value
                             else:
@@ -62,15 +62,29 @@ class VariableManager:
         """Direct access to variables for CLI compatibility."""
         return self._variables
 
-    def get_variables(self) -> Dict[str, Any]:
-        """Get all variables."""
+    def get_variables(self, flatten_custom_vars: bool = False) -> Dict[str, Any]:
+        """Get all variables.
+
+        Args:
+            flatten_custom_vars: If True, include custom variable values directly in result.
+                               If False, keep them under 'custom_vars' key.
+        """
         result = {
             "domain": self._variables["domain"],
             "ttl": self._variables["ttl"],
-            "_descriptions": self._variables["_descriptions"],
+            "descriptions": self._variables["descriptions"],
         }
         if "custom_vars" in self._variables:
-            result["custom_vars"] = self._variables["custom_vars"]
+            if flatten_custom_vars:
+                # Include custom variable values directly in the result
+                for name, var in self._variables["custom_vars"].items():
+                    if isinstance(var, dict) and "value" in var:
+                        result[name] = var["value"]
+                    else:
+                        result[name] = var  # Handle case where var is already a value
+            else:
+                # Keep custom variables nested under custom_vars
+                result["custom_vars"] = self._variables["custom_vars"]
         return result
 
     def get_variable(self, key: str) -> Optional[SingleVariableModel]:
@@ -82,14 +96,14 @@ class VariableManager:
         Returns:
             SingleVariableModel if found, None otherwise
         """
-        if key == "_descriptions":
+        if key == "descriptions":
             return None
 
         if key in ["domain", "ttl"]:
             return SingleVariableModel(
                 name=key,
                 value=self._variables[key],
-                description=self._variables["_descriptions"].get(key, ""),
+                description=self._variables["descriptions"].get(key, ""),
             )
         elif "custom_vars" in self._variables and key in self._variables["custom_vars"]:
             var = self._variables["custom_vars"][key]
@@ -111,7 +125,7 @@ class VariableManager:
             if name in ["domain", "ttl"]:
                 self._variables[name] = variable.value
                 if variable.description:
-                    self._variables["_descriptions"][name] = variable.description
+                    self._variables["descriptions"][name] = variable.description
             else:
                 if "custom_vars" not in self._variables:
                     self._variables["custom_vars"] = {}
@@ -126,7 +140,7 @@ class VariableManager:
             if name in ["domain", "ttl"]:
                 self._variables[name] = variable.get("value")
                 if variable.get("description"):
-                    self._variables["_descriptions"][name] = variable["description"]
+                    self._variables["descriptions"][name] = variable["description"]
             else:
                 if "custom_vars" not in self._variables:
                     self._variables["custom_vars"] = {}
@@ -175,7 +189,7 @@ class VariableManager:
                 SingleVariableModel(
                     name=name,
                     value=self._variables[name],
-                    description=self._variables["_descriptions"].get(name, ""),
+                    description=self._variables["descriptions"].get(name, ""),
                 )
             )
         # Add custom variables
@@ -203,10 +217,10 @@ class VariableManager:
             if "ttl" in variables:
                 self._variables["ttl"] = variables["ttl"]
             # Update descriptions if present
-            if "_descriptions" in variables:
-                desc_val = variables["_descriptions"]
+            if "descriptions" in variables:
+                desc_val = variables["descriptions"]
                 if isinstance(desc_val, dict):
-                    self._variables["_descriptions"].update(desc_val)
+                    self._variables["descriptions"].update(desc_val)
             # Update custom variables
             if "custom_vars" in variables:
                 self._variables["custom_vars"] = variables["custom_vars"]
@@ -215,7 +229,7 @@ class VariableManager:
                 if "custom_vars" not in self._variables:
                     self._variables["custom_vars"] = {}
                 for name, value in variables.items():
-                    if name not in ["domain", "ttl", "_descriptions"]:
+                    if name not in ["domain", "ttl", "descriptions"]:
                         if isinstance(value, dict) and "value" in value:
                             self._variables["custom_vars"][name] = value
                         else:
@@ -228,8 +242,8 @@ class VariableManager:
             self._variables["domain"] = variables.domain
             self._variables["ttl"] = variables.ttl
             # Update descriptions if present
-            if variables._descriptions:
-                self._variables["_descriptions"].update(variables._descriptions)
+            if variables.descriptions:
+                self._variables["descriptions"].update(variables.descriptions)
             # Update custom variables
             if variables.custom_vars:
                 self._variables["custom_vars"] = variables.custom_vars
@@ -240,11 +254,11 @@ class VariableManager:
 
     def clear_variables(self) -> None:
         """Clear all variables except defaults."""
-        descriptions = self._variables.get("_descriptions", {})
+        descriptions = self._variables.get("descriptions", {})
         self._variables = {
             "domain": "",
             "ttl": 3600,
-            "_descriptions": {
+            "descriptions": {
                 "domain": descriptions.get("domain", "Domain name"),
                 "ttl": descriptions.get("ttl", "Default TTL"),
             },
@@ -290,7 +304,7 @@ class VariableManager:
 
     def __getitem__(self, key: str) -> Any:
         """Get a variable value."""
-        if key == "_descriptions":
+        if key == "descriptions":
             return None
         if key in ["domain", "ttl"]:
             return self._variables[key]
@@ -300,7 +314,7 @@ class VariableManager:
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set a variable value."""
-        if key == "_descriptions":
+        if key == "descriptions":
             return
         if key in ["domain", "ttl"]:
             self._variables[key] = value
@@ -315,7 +329,7 @@ class VariableManager:
 
     def __contains__(self, key: str) -> bool:
         """Check if a variable exists."""
-        if key == "_descriptions":
+        if key == "descriptions":
             return False
         return key in ["domain", "ttl"] or (
             "custom_vars" in self._variables and key in self._variables["custom_vars"]
@@ -425,6 +439,6 @@ class VariableManager:
         """
         if not name or not isinstance(name, str):
             return False
-        if name == "_descriptions":
+        if name == "descriptions":
             return False
         return True

@@ -37,8 +37,9 @@ class Template:
                 # If env_data is already a model instance
                 self.environments[env_name] = env_data
 
-        # Initialize records
+        # Initialize records with flattened variables for template loading
         self.records = {}
+        variables = self.variables.get_variables(flatten_custom_vars=True)
         for record_type, records in data.get("records", {}).items():
             self.records[record_type] = []
             for record_data in records:
@@ -48,7 +49,6 @@ class Template:
                 record_data["type"] = record_type  # Add the type field
                 if "ttl" not in record_data:
                     # Use default TTL from variables if available
-                    variables = self.variables.get_variables()
                     if "ttl" in variables:
                         record_data["ttl"] = variables["ttl"]
                     else:
@@ -89,7 +89,7 @@ class Template:
             environments_dict[env_name] = env.model_dump()
 
         result = {
-            "variables": self.variables.get_variables(),
+            "variables": self.variables.get_variables(flatten_custom_vars=False),
             "environments": environments_dict,
             "records": records_dict,
             "settings": {
@@ -108,7 +108,7 @@ class Template:
     def __getitem__(self, key: str) -> Any:
         """Get item from template data."""
         if key == "variables":
-            return self.variables.get_variables()
+            return self.variables.get_variables(flatten_custom_vars=False)
         return self._data[key]
 
     def __setitem__(self, key: str, value: Any) -> None:
@@ -124,7 +124,7 @@ class Template:
     def get(self, key: str, default: Any = None) -> Any:
         """Get item from template data with default value."""
         if key == "variables":
-            return self.variables.get_variables()
+            return self.variables.get_variables(flatten_custom_vars=False)
         return self._data.get(key, default)
 
     def items(self):
