@@ -33,6 +33,11 @@
    - Go to your GitHub repository settings
    - Click Settings > Environments > New environment
    - Create environment named: pypi
+   - Click "Configure environment"
+   - Under "Environment secrets":
+     * Click "Add secret"
+     * Name: PYPI_API_TOKEN (must match exactly)
+     * Value: (paste your PyPI API token)
    - No additional protection rules needed
    - Click "Save protection rules"
 
