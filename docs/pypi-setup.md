@@ -8,8 +8,8 @@
    - Log in to PyPI
    - Go to https://pypi.org/manage/account/token/
    - Click "Add API token"
-   - Name it something like "GitHub Actions Upload Token"
-   - Set scope to "Entire account (all projects)"
+   - Name: "dns-services-gateway-github-actions"
+   - Set scope to: "Project: dns-services-gateway"
    - Copy the token immediately (you won't see it again)
 
 3. Add Token to GitHub:
