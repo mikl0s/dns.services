@@ -33,13 +33,8 @@
    - Go to your GitHub repository settings
    - Click Settings > Environments > New environment
    - Create environment named: pypi
-   - Click "Configure environment"
-   - Under "Environment secrets":
-     * Click "Add secret"
-     * Name: PYPI_API_TOKEN (must match exactly)
-     * Value: (paste your PyPI API token)
-   - No additional protection rules needed
-   - Click "Save protection rules"
+   - No additional configuration needed
+   - Click "Save"
 
 5. Test the Setup:
    - Once the publisher is approved
@@ -47,6 +42,6 @@
    - The GitHub Actions workflow will automatically:
      - Run tests
      - Build the package
-     - Upload to PyPI if all tests pass
+     - Upload to PyPI using trusted publishing
 
 Note: The package will be available at: https://pypi.org/project/dns.services/
