@@ -6,7 +6,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Development Status](https://img.shields.io/badge/status-alpha-yellow.svg)](https://pypi.org/project/dns-services-gateway/)
 
-> **Built with [Windsurf](https://www.codeium.com/windsurf)**
+> **Built with various AI coding tools**
 >
 > This entire production-ready module was created in just two weeks during the evenings using Windsurf Editor. From initial planning to comprehensive testing, Windsurf's AI-powered capabilities enabled rapid development while maintaining exceptional code quality:
 >
