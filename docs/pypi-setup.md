@@ -4,36 +4,35 @@
    - Go to https://pypi.org/account/register/
    - Create an account if you don't have one
 
-2. Generate an API Token:
-   - Log in to PyPI
-   - Go to https://pypi.org/manage/account/token/
-   - Click "Add API token"
-   - Fill out these exact fields:
-     * Token name: GitHub Actions
-     * Token scope: Project: dns-services-gateway
-     * Intended use: Automated publishing
-     * Organization: No organization
-   - Copy the token immediately (you won't see it again)
+2. Initial Manual Package Upload:
+   - Build the package locally:
+     ```bash
+     python -m pip install --upgrade build twine
+     python -m build
+     ```
+   - Upload to PyPI:
+     ```bash
+     python -m twine upload dist/*
+     ```
+   - This will prompt for your PyPI username and password
+   - After successful upload, you'll be the package owner
 
-3. Add Environment to GitHub:
-   - Go to your GitHub repository
-   - Click Settings > Environments > New environment
+3. Configure GitHub Actions Publishing:
+   - Go to PyPI project settings: https://pypi.org/manage/project/dns-services-gateway/settings/
+   - Under "Publishing", click "Add pending publisher"
    - Fill out these exact fields:
      * Owner: mikl0s
      * Repository name: dns.services
      * Workflow name: ci.yml
      * Environment name: release
    - Click "Add"
-   - In the environment settings:
-     * Click "Add secret"
-     * Name: PYPI_API_TOKEN
-     * Value: (paste the token you copied from PyPI)
-     * Click "Add secret"
+   - Wait for PyPI administrators to approve the publisher
 
 4. Test the Setup:
+   - Once the publisher is approved
    - Create a new release tag in GitHub
    - The GitHub Actions workflow will automatically:
-     - Run tests across all supported Python versions
+     - Run tests
      - Build the package
      - Upload to PyPI if all tests pass
 
