@@ -17,7 +17,7 @@
    - This will prompt for your PyPI username and password
    - After successful upload, you'll be the package owner
 
-3. Configure GitHub Actions Publishing:
+3. Configure PyPI Trusted Publishing:
    - Go to PyPI project settings: https://pypi.org/manage/project/dns.services/settings/
    - Under "Publishing", click "Add pending publisher"
    - Fill out these exact fields:
@@ -29,7 +29,14 @@
    - Click "Add"
    - Wait for PyPI administrators to approve the publisher
 
-4. Test the Setup:
+4. Configure GitHub Environment:
+   - Go to your GitHub repository settings
+   - Click Settings > Environments > New environment
+   - Create environment named: pypi
+   - No additional protection rules needed
+   - Click "Save protection rules"
+
+5. Test the Setup:
    - Once the publisher is approved
    - Create a new release tag in GitHub
    - The GitHub Actions workflow will automatically:
