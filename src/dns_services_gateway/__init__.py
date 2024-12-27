@@ -5,7 +5,7 @@ It handles authentication, token management, and provides a clean interface for
 making API requests.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.9.7"
 __author__ = "DNS Services Gateway Contributors"
 __license__ = "MIT"
 
