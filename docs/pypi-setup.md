@@ -8,8 +8,11 @@
    - Log in to PyPI
    - Go to https://pypi.org/manage/account/token/
    - Click "Add API token"
-   - Name: "dns-services-gateway-github-actions"
-   - Set scope to: "Project: dns-services-gateway"
+   - Fill out these exact fields:
+     * Token name: GitHub Actions
+     * Token scope: Project: dns-services-gateway
+     * Intended use: Automated publishing
+     * Organization: No organization
    - Copy the token immediately (you won't see it again)
 
 3. Add Environment to GitHub:
