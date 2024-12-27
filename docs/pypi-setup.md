@@ -18,13 +18,14 @@
    - After successful upload, you'll be the package owner
 
 3. Configure GitHub Actions Publishing:
-   - Go to PyPI project settings: https://pypi.org/manage/project/dns-services-gateway/settings/
+   - Go to PyPI project settings: https://pypi.org/manage/project/dns.services/settings/
    - Under "Publishing", click "Add pending publisher"
    - Fill out these exact fields:
+     * PyPI Project Name: dns.services
      * Owner: mikl0s
      * Repository name: dns.services
      * Workflow name: ci.yml
-     * Environment name: release
+     * Environment name: pypi
    - Click "Add"
    - Wait for PyPI administrators to approve the publisher
 
@@ -36,4 +37,4 @@
      - Build the package
      - Upload to PyPI if all tests pass
 
-Note: The package will be available at: https://pypi.org/project/dns-services-gateway/
+Note: The package will be available at: https://pypi.org/project/dns.services/

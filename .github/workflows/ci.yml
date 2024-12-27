@@ -36,7 +36,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    environment: release
+    environment: pypi
     permissions:
       id-token: write
       contents: read
