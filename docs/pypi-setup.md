@@ -12,13 +12,20 @@
    - Set scope to: "Project: dns-services-gateway"
    - Copy the token immediately (you won't see it again)
 
-3. Add Token to GitHub:
+3. Add Environment to GitHub:
    - Go to your GitHub repository
-   - Click Settings > Secrets and variables > Actions
-   - Click "New repository secret"
-   - Name: PYPI_API_TOKEN
-   - Value: (paste the token you copied from PyPI)
-   - Click "Add secret"
+   - Click Settings > Environments > New environment
+   - Fill out these exact fields:
+     * Owner: mikl0s
+     * Repository name: dns.services
+     * Workflow name: ci.yml
+     * Environment name: release
+   - Click "Add"
+   - In the environment settings:
+     * Click "Add secret"
+     * Name: PYPI_API_TOKEN
+     * Value: (paste the token you copied from PyPI)
+     * Click "Add secret"
 
 4. Test the Setup:
    - Create a new release tag in GitHub
