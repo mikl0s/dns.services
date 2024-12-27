@@ -17,3 +17,4 @@ pytest-mock
 fastapi
 uvicorn
 coverage
+mock

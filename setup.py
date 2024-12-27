@@ -15,6 +15,7 @@ setup(
         "click>=8.0.0",
         "PyJWT>=2.0.0",
         "python-dateutil>=2.8.2",
+        "rich>=13.7.0",
     ],
     entry_points={
         "console_scripts": [
