@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Development Status](https://img.shields.io/badge/status-alpha-yellow.svg)](https://pypi.org/project/dns-services-gateway/)
+[![PyPI Downloads](https://static.pepy.tech/badge/dns-services-gateway)](https://pepy.tech/projects/dns-services-gateway)
 
 > **Built with various AI coding tools**
 >
